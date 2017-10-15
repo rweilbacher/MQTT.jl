@@ -1,5 +1,14 @@
 # Public methods
 
+# MQTTMessageInfo helper methods
+# Wait until the associated message has been published
+function wait_for_publish(info::MQTTMessageInfo)
+end
+
+#Could be needed to notify threads waiting for this message to get published
+function set_published(info::MQTTMessageInfo)
+end
+
 # TODO rework method arguments, some get the entire client but only need a couple elements. Maybe it's better to only give them those specifically
 # Private methods
 function send_puback(client, mid)
@@ -17,7 +26,7 @@ function pack_str16(packet, data)
   # Strings need to be UTF-8
 end
 
-function send_publish(client, mid, topic, payload, qos, retain=false, dup=false, info)
+function send_publish(client, mid, topic, payload, qos, info, retain=false, dup=false)
   # Assumes topic and payload are properly encoded
 end
 
@@ -105,10 +114,11 @@ end
 function handle_on_message(client)
 end
 
+# Sends out queued up messages until max_inflight_messages is reached
 function update_inflight(client)
 end
 
-# Reduces inflight_messages and calls update_inflight() if inflight_messages is bigger than max_inflight_messages (Refer to Python implementation for details)
+# Reduces inflight_messages and calls update_inflight()
 function do_on_publish(client, idx, mid)
 end
 
@@ -116,7 +126,7 @@ end
 function thread_main()
 end
 
-# Waits the appropriate time for reconnectiong and adjust reconnect time
+# Waits the appropriate time for reconnectiong and adjusts reconnect time
 function reconnect_wait(client)
 end
 
@@ -162,7 +172,7 @@ end
 function write(client, data)
 end
 
-'''struct Client
+#=struct Client
   keep_alive::UInt16
   on_msg::Function
   socket::TCPSocket
@@ -219,4 +229,4 @@ function subscribe(client, topics...)
 end
 
 function publish(client, topic, bytes)
-end'''
+end=#
