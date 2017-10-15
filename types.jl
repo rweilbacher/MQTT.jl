@@ -1,4 +1,4 @@
-type MQTTMessageInfo
+mutable struct MQTTMessageInfo
   """This is a class returned from Client.publish() and can be used to find
   out the mid of the message that was published, and to determine whether the
   message has been published, and/or wait until it is published.
@@ -18,7 +18,7 @@ type MQTTMessageInfo
   end
 end
 
-type MQTTMessage
+mutable struct MQTTMessage
   """ This is a class that describes an incoming or outgoing message. It is
   passed to the on_message callback as the message parameter.
   """
@@ -38,7 +38,7 @@ type MQTTMessage
   end
 end
 
-type Client
+mutable struct Client
   """MQTT version 3.1/3.1.1 client class.
 
     This is the main class for use communicating with an MQTT broker.
@@ -139,8 +139,8 @@ type Client
     clean_session{Bool}
     username
     password
-    in_packet{Packet}
-    out_packet # the queue for holding outbund packets? (TODO check python implementation again)
+    in_packets{Packet}
+    out_packets # the queue for holding outbund packets? (TODO check python implementation again)
     current_out_pack{Packet}
     last_msg_in # time of the last incoming msg
     last_msg_out
@@ -179,20 +179,20 @@ type Client
     websocket_path  # just for for completion, no way we are implementing this
     websocket_extra_headers  # same
 
-    function on_log end
-    function on_connect end
-    function on_subscribe end
-    function on_message end
-    function on_publish end
-    function on_unsubscribe end
-    function on_disconnect end
+    on_log::Function
+    on_connect::Function
+    on_subscribe::Function
+    on_message::Function
+    on_publish::Function
+    on_unsubscribe::Function
+    on_disconnect::Function
 
-    function on_message_filtered end #TODO ??
+    on_message_filtered::Function #TODO ??
 
     # maybe a socket pair is needed to break out of select
 end
 
-type MQTTPacket
+mutable struct MQTTPacket
   command # the MQTT command read from the packet
   have_remaining{Bool} # indicates wether remaining_count has been read from packet
   remaining_count # the bytes of remaining length
@@ -204,7 +204,7 @@ type MQTTPacket
   info{MQTTMessageInfo} # the message info object tied to this packet
 end
 
-type MQTTWill
+mutable struct MQTTWill
   topic
   payload
   qos
