@@ -1,6 +1,153 @@
 # Public methods
 
+# TODO getter
+function topic(client)
+end
+
+# TODO setter
+function topic(client, value)
+end
+
+function reinitialise(client, client_id, clean_session, userdata)
+end
+
+# TODO websocket
+function ws_set_options(client, path, headers)
+end
+
+# TODO ssl
+function tls_set_context(client, context)
+end
+
+# TODO ssl
+function tls_set(client, ca_certs, certfile, keyfile, cert_reqs, tls_version, ciphers)
+end
+
+# TODO ssl
+function tls_insecure_set(client, value)
+end
+
+# TODO logging
+function enable_logger(client, logger)
+end
+
+# TODO logging
+function disable_logger(client)
+end
+
+function connect(client, host, port, keepalive, bind_address)
+end
+
+function connect_srv(client, domain, keepalive, bind_address)
+end
+
+function connect_async(client, host, port, keepalive, bind_address)
+end
+
+function reconnect_delay_set(client, min_delay, max_delay)
+end
+
+function reconnect(client)
+end
+
+function loop(client, timeout, max_packets)
+end
+
+function publish(client, topic, payload, qos, retain)
+end
+
+function username_pw_set(client, username, password)
+end
+
+function disconnect(client)
+end
+
+function subscribe(client, topic, qos)
+end
+
+function unsubscribe(client, topic)
+end
+
+function loop_read(client, max_packets)
+end
+
+function loop_write(client, max_packets)
+end
+
+function want_write(client)
+end
+
+function loop_misc(client)
+end
+
+function max_inflight_messages_set(client, inflight)
+end
+
+function max_queued_messages_set(client, queue_size)
+end
+
+function message_retry_set(client, retry)
+end
+
+function user_data_set(client, userdata)
+end
+
+function will_set(client, topic, payload, qos, retain)
+end
+
+function will_clear(client)
+end
+
+function socket(client)
+end
+
+function loop_forever(client, timeout, max_packets, retry_first_connection)
+end
+
+function loop_start(client)
+end
+
+function loop_stop(client, force)
+end
+
+function message_callback_add(client, sub, callback)
+end
+
+function message_callback_remove(client, sub)
+end
+
 # MQTTMessageInfo helper methods
+
+function _loop_rc_handle(client, rc)
+end
+
+function _packet_read(client)
+end
+
+function _packet_write(client)
+end
+
+function _easy_log(client, level, fmt, args)
+end
+
+function _check_keepalive(client)
+end
+
+function _mid_generate(client)
+end
+
+function _topic_wildcard_len_check(topic)
+end
+
+function _filter_wildcard_len_check(sub)
+end
+
+function _send_pingreq(client)
+end
+
+function _send_pingresp(client)
+end
+
 # Wait until the associated message has been published
 function wait_for_publish(info::MQTTMessageInfo)
 end
