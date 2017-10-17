@@ -8,9 +8,6 @@ end
 function topic(client, value)
 end
 
-function reinitialise(client, client_id, clean_session, userdata)
-end
-
 # TODO websocket
 function ws_set_options(client, path, headers)
 end
@@ -35,6 +32,10 @@ end
 function disable_logger(client)
 end
 
+# Resets the client. Useful because client will attempt to resend messages still in queue after reconnect
+function reinitialise(client, client_id, clean_session, userdata)
+end
+
 function connect(client, host, port, keepalive, bind_address)
 end
 
@@ -50,12 +51,14 @@ end
 function reconnect(client)
 end
 
+# TODO replace this with in- and out loop
 function loop(client, timeout, max_packets)
 end
 
 function publish(client, topic, payload, qos, retain)
 end
 
+# TODO setter
 function username_pw_set(client, username, password)
 end
 
@@ -68,85 +71,109 @@ end
 function unsubscribe(client, topic)
 end
 
+# Used if client wants to handle the reads himself. Shouldn't be used if loop_start() is being used
 function loop_read(client, max_packets)
 end
 
+# Used if client wants to handle the writes himself. Shouldn't be used if loop_start() is being used
 function loop_write(client, max_packets)
 end
 
+# Used to determine wether or not there is network data to be written. Useful if client is using select himself
 function want_write(client)
 end
 
+# Used to process miscellanous network events. Shouldn't be used if loop_start() is being used
 function loop_misc(client)
 end
 
+# TODO setter
 function max_inflight_messages_set(client, inflight)
 end
 
+# TODO setter
 function max_queued_messages_set(client, queue_size)
 end
 
+# TODO setter
 function message_retry_set(client, retry)
 end
 
+# TODO setter
 function user_data_set(client, userdata)
 end
 
+# TODO setter
 function will_set(client, topic, payload, qos, retain)
 end
 
+# deletes the current will in client. Not strictly necessary
 function will_clear(client)
 end
 
+# TODO getter
 function socket(client)
 end
 
+# Calls loop in an infite blocking loop. Useful if the MQTT client loop is the only thing you want to run in your program
+# TODO Does this still make sense?
 function loop_forever(client, timeout, max_packets, retry_first_connection)
 end
 
+# Starts the loop to process network traffic in a thread, if you don't want to call loop repeatedly yourself
 function loop_start(client)
 end
 
+# Stops the network loops
 function loop_stop(client, force)
 end
 
+# TODO is this necessary?
 function message_callback_add(client, sub, callback)
 end
 
+# TODO is this necessary?
 function message_callback_remove(client, sub)
 end
 
+# Private
+
+# TODO what does this do?
+function loop_rc_handle(client, rc)
+end
+
+function packet_read(client)
+end
+
+function packet_write(client)
+end
+
+# TODO logger
+function easy_log(client, level, fmt, args)
+end
+
+function check_keepalive(client)
+end
+
+# Returns the next valid message id
+function mid_generate(client)
+end
+
+# Helper method to check if it is possible to publish to topic
+function topic_wildcard_len_check(topic)
+end
+
+# Helper method to check if it is possible to publish to topic
+function filter_wildcard_len_check(sub)
+end
+
+function send_pingreq(client)
+end
+
+function send_pingresp(client)
+end
+
 # MQTTMessageInfo helper methods
-
-function _loop_rc_handle(client, rc)
-end
-
-function _packet_read(client)
-end
-
-function _packet_write(client)
-end
-
-function _easy_log(client, level, fmt, args)
-end
-
-function _check_keepalive(client)
-end
-
-function _mid_generate(client)
-end
-
-function _topic_wildcard_len_check(topic)
-end
-
-function _filter_wildcard_len_check(sub)
-end
-
-function _send_pingreq(client)
-end
-
-function _send_pingresp(client)
-end
 
 # Wait until the associated message has been published
 function wait_for_publish(info::MQTTMessageInfo)
@@ -157,7 +184,7 @@ function set_published(info::MQTTMessageInfo)
 end
 
 # TODO rework method arguments, some get the entire client but only need a couple elements. Maybe it's better to only give them those specifically
-# Private methods
+
 function send_puback(client, mid)
 end
 
