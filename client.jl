@@ -5,7 +5,7 @@
 function wait_for_publish(info::MQTTMessageInfo)
 end
 
-#Could be needed to notify threads waiting for this message to get published
+# Could be needed to notify threads waiting for this message to get published
 function set_published(info::MQTTMessageInfo)
 end
 
@@ -76,8 +76,8 @@ end
 function messages_reconnect_reset(client)
 end
 
-# Queue a new packet and break out of select if in threaded mode TODO ?
-function packet_queue(client, command, packet, mid, qos, info)
+# Queue a new packet and break out of select if in threaded mode (called packet_queue in python) TODO ?
+function queue_packet(client, command, packet, mid, qos, info)
 end
 
 function handle_packet(packet)
