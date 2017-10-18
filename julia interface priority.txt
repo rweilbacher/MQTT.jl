@@ -7,26 +7,17 @@
 function connect(client, host, port, keepalive, bind_address)
 
 # TODO replace this with in- and out loop
-function loop(client, timeout, max_packets)
+function in_loop(client)
+
+function out_loop(client)
 
 function publish(client, topic, payload, qos, retain)
 
 function disconnect(client)
 
-
 function subscribe(client, topic, qos)
 
 function unsubscribe(client, topic)
-
-# Calls loop in an infite blocking loop. Useful if the MQTT client loop is the only thing you want to run in your program
-# TODO Does this still make sense?
-function loop_forever(client, timeout, max_packets, retry_first_connection)
-
-# Starts the loop to process network traffic in a thread, if you don't want to call loop repeatedly yourself
-function loop_start(client)
-
-# Stops the network loops
-function loop_stop(client, force)
 
 
 		# METHODS FOR SELF-MAINTAINING LOOP() CALLS
@@ -155,7 +146,6 @@ function handle_unsuback(client)
 
 function handle_pubackcomp(client)
 
-# TODO ?
 function handle_on_message(client)
 
 # Sends out queued up messages until max_inflight_messages is reached
@@ -192,26 +182,17 @@ function messagesend_reconnect_reset(client)
 # Waits the appropriate time for reconnectiong and adjusts reconnect time
 function reconnect_wait(client)
 
+function send_pingreq(client)
+
+function send_pingresp(client)
+
+function check_keepalive(client)
+
 		
 		# DON'T KNOW
 		
 # TODO what does this do?
 function loop_rc_handle(client, rc)
-
-# TODO ?
-function check_keepalive(client)
-
-function send_pingreq(client)
-
-function send_pingresp(client)
-
-#TODO this calls loop_forever this might need to get reworked for Julia
-function thread_main()
-
-function close(client)
-
-#TODO ?!
-function fileno(client)
 
 		
 		# FEATURES FOR LATER

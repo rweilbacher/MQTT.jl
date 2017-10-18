@@ -51,10 +51,6 @@ end
 function reconnect(client)
 end
 
-# TODO replace this with in- and out loop
-function loop(client, timeout, max_packets)
-end
-
 function publish(client, topic, payload, qos, retain)
 end
 
@@ -138,6 +134,14 @@ end
 
 # Private
 
+#TODO desc
+function in_loop(client)
+end
+
+#TODO desc
+function out_loop(client)
+end
+
 # TODO what does this do?
 function loop_rc_handle(client, rc)
 end
@@ -152,6 +156,7 @@ end
 function easy_log(client, level, fmt, args)
 end
 
+# TODO ?
 function check_keepalive(client)
 end
 

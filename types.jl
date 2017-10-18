@@ -124,13 +124,13 @@ mutable struct Client
   userdata # the data that will be handed to the callback function every time
   sock # the socket used for communication
   keepalive::Bool
-  message_retry #TODO this is 20 what does it actually mean -> comment here
+  message_retry
   last_retry_check #TODO is this a a timestamp?
   clean_session::Bool
   username::String
   password::String
   in_packet
-  out_packets # the queue for holding outbund packets? (TODO check python implementation again)
+  out_packets
   current_out_pack
   last_msg_in # time of the last incoming msg
   last_msg_out
@@ -150,18 +150,16 @@ mutable struct Client
   port::UInt32
   bind_address #TODO ?
 
-  #TODO mutex stuff. Find out if this is needed and for what
-  in_callback #TODO ?
+  # TODO think of which mutexes we need
+  #=in_callback
   callback_mutex
   out_packet_mutex
   current_out_packet_mutex
   msgtime_mutex
   out_message_mutex
   in_message_mutex
-  reconnect_delay_mutex
+  reconnect_delay_mutex=#
 
-  thread #TODO ?
-  thread_terminate #TODO ?
   ssl
   ssl_context
   tls_insecure
