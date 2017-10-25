@@ -1,0 +1,141 @@
+# TODO rework method arguments, some get the entire client but only need a couple elements. Maybe it's better to only give them those specifically
+
+# ----------Public---------- #
+
+	# Alex, Roland
+		# ESSENTIAL
+		
+function connect(client, host, port, keepalive, bind_address)
+
+# TODO replace this with in- and out loop
+function in_loop(client)
+
+function out_loop(client)
+
+# TODO rename this
+# Used to process miscellanous network events. Shouldn't be used if loop_start() is being used
+function loop_misc(client)
+
+
+
+	# Pia, Alexander
+
+function publish(client, topic, payload, qos, retain)
+
+function disconnect(client)
+
+function subscribe(client, topic, qos)
+
+function unsubscribe(client, topic)
+
+
+
+# ----------Private----------
+
+	# Alex, Roland
+
+# TODO rename this method
+function loop_rc_handle(client, rc)
+
+		# ESSENTIAL
+function packet_read(client)
+
+function packet_write(client)
+
+# Checks the state of each message and retries accordingly
+function message_retry_check_actual(client, messages, mutex)
+
+# Calls message_retry_check_actual for in- and outbound messages
+function message_retry_check(client)
+
+function handle_packet(packet)
+
+function handle_on_message(client)
+
+
+
+
+
+
+	# Pia, Alexander
+
+# Pack the remaining length field in the packet appropriately
+function pack_remaining_length(packet, remaining_length)
+
+# Returns the next valid message id
+function mid_generate(client)
+
+# Pack 2 bytes of length-prefixed data into header.
+function pack_str16(packet, data)
+	# Strings need to be UTF-8
+  
+# Queue a new packet and break out of select if in threaded mode (called packet_queue in python) TODO ?
+function queue_packet(client, command, packet, mid, qos, info)
+
+# Reduces inflight_messages and calls update_inflight()
+function do_on_publish(client, idx, mid)
+
+# Sends out queued up messages until max_inflight_messages is reached
+function update_inflight(client)
+
+# Helper method to check if it is possible to publish to topic
+function topic_wildcard_len_check(topic)
+
+# Helper method to check if it is possible to publish to topic
+function filter_wildcard_len_check(sub)
+
+
+
+
+
+	# Nathan, Pia_O
+
+function handle_pingreq(client)
+
+function handle_pingresp(client)
+
+function handle_connack(client)
+
+function handle_suback(client)
+
+function handle_publish(client)
+
+function handle_pubrel(client)
+
+function handle_pubrec(client)
+
+function handle_unsuback(client)
+
+function handle_pubackcomp(client)
+
+
+
+# For DISCONNECT, PINGREQ and PINGRESP
+function send_simple_command(client, command)
+
+function send_connect(client, keepalive, clean_session)
+
+function send_disconnect(client)
+
+function send_subscribe(client, topic, dup)
+
+function send_unsubscribe(client, topic, dup)
+
+function send_pubrec(client)
+
+function send_pubrel(client)
+
+function send_publish(client, mid, topic, payload, qos, info, retain=false, dup=false)
+	# Assumes topic and payload are properly encoded
+
+# For PUBACK, PUBCOMP, PUBREC, and PUBREL
+function send_command_with_mid(client, command, mid, dup)
+
+function send_puback(client, mid)
+
+function send_pubcomp(client, mid)
+
+
+
+
+		
