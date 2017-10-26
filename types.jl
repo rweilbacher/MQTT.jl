@@ -125,11 +125,11 @@ mutable struct Client
   sock # the socket used for communication
   keepalive::Bool
   message_retry
-  last_retry_check #TODO is this a a timestamp?
+  last_retry_check # TODO is this a a timestamp?
   clean_session::Bool
   username::String
   password::String
-  in_packet
+  in_packet   # TODO Not sure this is needed outside of packet_read
   out_packets
   current_out_pack
   last_msg_in # time of the last incoming msg
@@ -137,11 +137,11 @@ mutable struct Client
   reconnect_min_delay
   reconnect_max_delay
   reconnect_delay
-  pingt_t #TODO ?
-  last_mid  # the message id of the last msg (TODO sent or received?)
-  state # the state of the client TODO ?
+  pingt_t # TODO ?
+  last_mid  # the message id of the last msg sent
+  state # the state of the client
   out_messages  # Collection TODO when do these get deleted? when are they kept?
-  in_messages # Collection
+  in_messages # Collection TODO do we need to keep these?
   max_inflight_messages
   max_queued_messages
   has_will::Bool

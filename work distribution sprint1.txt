@@ -52,6 +52,8 @@ function handle_packet(packet)
 
 function handle_on_message(client)
 
+function handle_connack(client)
+
 
 
 
@@ -84,21 +86,43 @@ function topic_wildcard_len_check(topic)
 # Helper method to check if it is possible to publish to topic
 function filter_wildcard_len_check(sub)
 
+function handle_publish(client)
+
+function send_connect(client, keepalive, clean_session)
+
 
 
 
 
 	# Nathan, Pia_O
+	
+function send_publish(client, mid, topic, payload, qos, info, retain=false, dup=false) # Assumes topic and payload are properly encoded
+	
+function send_subscribe(client, topic, dup)
 
-function handle_pingreq(client)
+# For PUBACK, PUBCOMP, PUBREC, and PUBREL
+function send_command_with_mid(client, command, mid, dup)
 
-function handle_pingresp(client)
+function send_unsubscribe(client, topic, dup)
 
-function handle_connack(client)
+# For DISCONNECT, PINGREQ and PINGRESP
+function send_simple_command(client, command)
 
+function send_pubrec(client)
+
+function send_pubrel(client)
+
+function send_puback(client, mid)
+
+function send_pubcomp(client, mid)
+
+function send_disconnect(client)
+
+
+
+function handle_pubackcomp(client)
+	
 function handle_suback(client)
-
-function handle_publish(client)
 
 function handle_pubrel(client)
 
@@ -106,34 +130,12 @@ function handle_pubrec(client)
 
 function handle_unsuback(client)
 
-function handle_pubackcomp(client)
+function handle_pingreq(client)
+
+function handle_pingresp(client)
 
 
 
-# For DISCONNECT, PINGREQ and PINGRESP
-function send_simple_command(client, command)
-
-function send_connect(client, keepalive, clean_session)
-
-function send_disconnect(client)
-
-function send_subscribe(client, topic, dup)
-
-function send_unsubscribe(client, topic, dup)
-
-function send_pubrec(client)
-
-function send_pubrel(client)
-
-function send_publish(client, mid, topic, payload, qos, info, retain=false, dup=false)
-	# Assumes topic and payload are properly encoded
-
-# For PUBACK, PUBCOMP, PUBREC, and PUBREL
-function send_command_with_mid(client, command, mid, dup)
-
-function send_puback(client, mid)
-
-function send_pubcomp(client, mid)
 
 
 
