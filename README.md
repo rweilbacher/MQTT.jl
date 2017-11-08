@@ -14,3 +14,8 @@ push!(LOAD_PATH, "~/MQTT.jl/src")
 # Run runtests.jl inside the test dir
 ~/MQTT.jl/test/$ julia runtests.jl
 ```
+
+```julia
+Pkg.clone("https://github.com/kivaari/MQTT.jl.git")
+Pkg.test("MQTT")
+```
