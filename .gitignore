@@ -1,1 +1,3 @@
-desktop.ini
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
