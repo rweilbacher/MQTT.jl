@@ -4,16 +4,16 @@ include("utils.jl")
 include("client.jl")
 
 export
-connect,
-subscribe,
-unsubscribe,
-publish,
-subscribe_async,
-unsubscribe_async,
-publish_async,
-disconnect,
-disconnect_async,
-get,
-Client
+    Client,
+    connect_async,
+    connect,
+    subscribe_async,
+    subscribe,
+    unsubscribe_async,
+    unsubscribe,
+    publish_async,
+    publish,
+    disconnect,
+    get
 
 end

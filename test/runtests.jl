@@ -54,7 +54,7 @@ function test()
     @test is_out_correct("data/output/unsubreq.dat", tfh.out_channel)
 
     info("Testing disconnect")
-    disconnect_async(client)
+    disconnect(client)
     @test is_out_correct("data/output/disco.dat", tfh.out_channel)
 
     sleep(0.5)

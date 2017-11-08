@@ -33,6 +33,19 @@ struct Packet
     data::Any
 end
 
+struct Message
+    dup::Bool
+    qos::UInt8
+    retain::Bool
+    topic::String
+    payload::Array{UInt8}
+end
+
+struct User
+    name::String
+    password::String
+end
+
 mutable struct Client
     on_msg::Function
     keep_alive::UInt16
@@ -214,16 +227,11 @@ function get(future)
     return r
 end
 
-struct User
-    name::String
-    password::String
-end
-
-function connect(client::Client, host::AbstractString, port::Integer=1883;
+function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     keep_alive::UInt16=0x0000,
     client_id::String=randstring(8),
     user::User=User("", ""),
-    will::Tuple{String, Array{UInt8}, UInt8, Bool}=("", Array{UInt8}(), 0x00, false),
+    will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
     clean_session::Bool=true)
 
     client.socket = connect(host, port)
@@ -236,7 +244,7 @@ function connect(client::Client, host::AbstractString, port::Integer=1883;
 
     optional = ()
 
-    if length(will[1]) > 0
+    if length(will.topic) > 0
         # TODO
     end
 
@@ -251,70 +259,49 @@ function connect(client::Client, host::AbstractString, port::Integer=1883;
     client_id,
     optional...)
 
-    get(future)
-
-    info("connected to ", host, ":", port)
+    return future
 end
 
-function disconnect_async(client)
-    write_packet(client, DISCONNECT)
-
-    close(client.write_packets)
-
-    #TODO maybe close socketß
-end
+connect(client::Client, host::AbstractString, port::Integer=1883;
+keep_alive::UInt16=0x0000,
+client_id::String=randstring(8),
+user::User=User("", ""),
+will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
+clean_session::Bool=true) = get(connect_async(client, host, port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
 
 function disconnect(client)
-    disconnect_async(client)
-
-    wait(client.socket.closenotify)
+    write_packet(client, DISCONNECT)
+    close(client.write_packets)
     # TODO maybe close ourselves after timeout?
-    close(client.socket)
-    info("disconnected")
+    # wait(client.socket.closenotify)
+    # close(client.socket)
 end
 
 function subscribe_async(client, topics...)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
-
     write_packet(client, SUBSCRIBE | 0x02, id, topics...)
-
     return future
 end
 
 # TODO change topics to Tuple{String, UInt8}
 function subscribe(client, topics...)
     future = subscribe_async(client, topics...)
-
-    granted = get(future)
-
-    result = collect(topics)
-    for (i, v) in enumerate(granted)
-        if i % 2 == 0
-            result[i * 2] = v
-        end
-    end
-
-    info("subscribed to ", result)
+    return get(future)
 end
 
 function unsubscribe_async(client, topics...)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
-
     write_packet(client, UNSUBSCRIBE | 0x02, id, topics...)
-
     return future
 end
 
 function unsubscribe(client, topics...)
     future = unsubscribe_async(client, topics...)
-
-    get(future)
-
-    info("unsubscribed from ", topics)
+    return get(future)
 end
 
 #TODO make parameters easier to use. For example no b"QOS_1"
@@ -334,7 +321,7 @@ function publish(client::Client, topic::String, payload...;
     get(future)
 end
 
-#TODO make parameters easier to use. For example no b"QOS_1"
+# TODO make parameters easier to use. For example no b"QOS_1"
 function publish_async(client::Client, topic::String, payload...;
     dup::Bool=false,
     qos::UInt8=0x00,
