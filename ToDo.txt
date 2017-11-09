@@ -21,5 +21,5 @@ Sprint 1:
 		keepalive flow and package structure
 	
 Sprint 2:
-	implement clean session = true
+	implement clean session = false
 		work out what we need
