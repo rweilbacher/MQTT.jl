@@ -1,6 +1,7 @@
 include("testlib.jl")
 
 using MQTT
+import MQTT.Message
 using Base.Test
 
 # because of the way julia handles null its easier to link a client instance with one tcp connection
@@ -42,9 +43,9 @@ function test()
 
     info("Testing publish")
     put_from_file(tfh, "data/input/publish.dat")
-    publish_async(client, "test1", b"QOS_0", qos=0x00)
+    publish_async(client, "test1", "QOS_0", qos=0x00)
     @test is_out_correct("data/output/qos0pub.dat", tfh.out_channel)
-    publish_async(client, "test2", b"QOS_1", qos=0x01)
+    publish_async(client, "test2", "QOS_1", qos=0x01)
     put_from_file(tfh, "data/input/puback.dat")
     @test is_out_correct("data/output/qos1pub.dat", tfh.out_channel)
 

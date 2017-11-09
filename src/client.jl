@@ -39,6 +39,16 @@ struct Message
     retain::Bool
     topic::String
     payload::Array{UInt8}
+
+    function Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)
+      # Convert payload to UInt8 Array with PipeBuffer
+      buffer = PipeBuffer()
+      for i in payload
+          write(buffer, i)
+      end
+      encoded_payload = take!(buffer)
+      return new(dup, qos, retain, topic, encoded_payload)
+    end
 end
 
 struct User
@@ -123,6 +133,7 @@ end
 
 function handle_pubrecrel(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
+    # TODO cmd + 1 only works until we receive a packet we don't expect
     write_packet(client, cmd + 1, id)
 end
 
@@ -310,40 +321,26 @@ function publish(client::Client, topic::String, payload...;
     qos::UInt8=0x00,
     retain::Bool=false)
 
-    buffer = PipeBuffer()
-    for i in payload
-        write(buffer, i)
-    end
-    encoded_payload = take!(buffer)
-
-    future = publish(client, topic, encoded_payload, dup, qos, retain)
-
+    message = Message(dup, qos, retain, topic, payload...)
+    future = publish_async(client, message)
     get(future)
 end
 
-# TODO make parameters easier to use. For example no b"QOS_1"
 function publish_async(client::Client, topic::String, payload...;
     dup::Bool=false,
     qos::UInt8=0x00,
     retain::Bool=false)
 
-    buffer = PipeBuffer()
-    for i in payload
-        write(buffer, i)
-    end
-    encoded_payload = take!(buffer)
-
-    publish(client, topic, encoded_payload, dup, qos, retain)
+    message = Message(dup, qos, retain, topic, payload...)
+    publish_async(client, message)
 end
 
-function publish(client::Client, topic::String, payload::Array{UInt8},
-    dup::Bool, qos::UInt8, retain::Bool)
-
+function publish_async(client::Client, message::Message)
     future = Future()
     optional = ()
-    if qos == 0x00
+    if message.qos == 0x00
         put!(future, nothing)
-    elseif qos == 0x01 || qos == 0x02
+    elseif message.qos == 0x01 || message.qos == 0x02
         future = Future()
         id = packet_id(client)
         client.in_flight[id] = future
@@ -351,7 +348,7 @@ function publish(client::Client, topic::String, payload::Array{UInt8},
     else
         throw(MQTTException("invalid qos"))
     end
-    cmd = PUBLISH | ((dup & 0x1) << 3) | (qos << 1) | retain
-    write_packet(client, cmd, topic, optional..., payload)
+    cmd = PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+    write_packet(client, cmd, message.topic, optional..., message.payload)
     return future
 end
