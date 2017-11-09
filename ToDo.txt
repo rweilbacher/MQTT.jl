@@ -1,0 +1,25 @@
+Sprint 1:
+	enums (Alexander, Pia)
+		look at enums and how to use them
+	qos2 (Alexander, Pia)
+		separate handle_pubrecrel into two different methods and fix them
+	fix connect method (Alexander, Pia)
+		make it not hardcoded
+	ping/keepalive (Roland)
+		implement it
+	disconnect_async/disconnect (maybe Sprint 2) (Alex)
+		think about what we need to do and how
+		the reconnect should still work
+	put handle methods to other file (Alexander, Pia)
+		ez pz
+	topic check into publish (Alexander, Pia)
+	include unit tests into runtests.jl (Alexander, Pia)
+		
+	Tests: (Nathan, Pia)
+		qos2 flow and package structure
+		connect variations
+		keepalive flow and package structure
+	
+Sprint 2:
+	implement clean session = true
+		work out what we need
