@@ -41,13 +41,13 @@ struct Message
     payload::Array{UInt8}
 
     function Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)
-      # Convert payload to UInt8 Array with PipeBuffer
-      buffer = PipeBuffer()
-      for i in payload
-          write(buffer, i)
-      end
-      encoded_payload = take!(buffer)
-      return new(dup, qos, retain, topic, encoded_payload)
+        # Convert payload to UInt8 Array with PipeBuffer
+        buffer = PipeBuffer()
+        for i in payload
+            write(buffer, i)
+        end
+        encoded_payload = take!(buffer)
+        return new(dup, qos, retain, topic, encoded_payload)
     end
 end
 
@@ -188,7 +188,8 @@ function write_loop(client)
         end
     catch e
         if isa(e, InvalidStateException)
-            info("write loop stopped '", e.msg, "'")
+            # channel closed
+            close(client.socket)
         else
             rethrow()
         end
@@ -209,9 +210,8 @@ function read_loop(client)
             handlers[cmd](client, buffer, cmd, flags)
         end
     catch e
-        if isa(e, EOFError)
-            info("read loop stopped")
-        else
+        # socket closed
+        if !isa(e, EOFError)
             rethrow()
         end
     end
@@ -283,9 +283,7 @@ clean_session::Bool=true) = get(connect_async(client, host, port, keep_alive=kee
 function disconnect(client)
     write_packet(client, DISCONNECT)
     close(client.write_packets)
-    # TODO maybe close ourselves after timeout?
-    # wait(client.socket.closenotify)
-    # close(client.socket)
+    wait(client.socket.closenotify)
 end
 
 function subscribe_async(client, topics...)
@@ -339,7 +337,7 @@ function publish_async(client::Client, message::Message)
     future = Future()
     optional = ()
     if message.qos == 0x00
-        put!(future, nothing)
+        put!(future, 0)
     elseif message.qos == 0x01 || message.qos == 0x02
         future = Future()
         id = packet_id(client)

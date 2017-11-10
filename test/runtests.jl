@@ -1,11 +1,9 @@
+include("basic.jl")
 include("testlib.jl")
 
 using MQTT
 import MQTT.Message
 using Base.Test
-
-# because of the way julia handles null its easier to link a client instance with one tcp connection
-# this could create problems in the future if you want to implement some reconnection for example
 
 function on_msg(topic, payload)
     info("Received message topic: [", topic, "] payload: [", String(payload), "]")
@@ -58,7 +56,7 @@ function test()
     disconnect(client)
     @test is_out_correct("data/output/disco.dat", tfh.out_channel)
 
-    sleep(0.5)
+    sleep(2)
 end
 
 test()

@@ -1,5 +1,3 @@
-
-
 import Base: connect, read, write, close
 
 mutable struct TestFileHandler <: IO
@@ -26,7 +24,7 @@ function read(fh::TestFileHandler, length::Integer)
 end
 
 function close(fh::TestFileHandler)
-    #Do nothing
+    notify(fh.closenotify)
 end
 
 function write(fh::TestFileHandler, data::UInt8)
