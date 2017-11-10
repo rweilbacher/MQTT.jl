@@ -131,10 +131,14 @@ function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     put!(client.in_flight[id], nothing)
 end
 
-function handle_pubrecrel(client::Client, s::IO, cmd::UInt8, flags::UInt8)
+function handle_pubrec(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
-    # TODO cmd + 1 only works until we receive a packet we don't expect
-    write_packet(client, cmd + 1, id)
+    write_packet(client, PUBREL  | 0x02, id)
+end
+
+function handle_pubrel(client::Client, s::IO, cmd::UInt8, flags::UInt8)
+    id = mqtt_read(s, UInt16)
+    write_packet(client, PUBCOMP, id)
 end
 
 function handle_suback(client::Client, s::IO, cmd::UInt8, flags::UInt8)
@@ -155,8 +159,8 @@ const handlers = Dict{UInt8, Function}(
 CONNACK => handle_connack,
 PUBLISH => handle_publish,
 PUBACK => handle_ack,
-PUBREC => handle_pubrecrel,
-PUBREL => handle_pubrecrel,
+PUBREC => handle_pubrec,
+PUBREL => handle_pubrel,
 PUBCOMP => handle_ack,
 SUBACK => handle_suback,
 UNSUBACK => handle_ack,
@@ -187,8 +191,8 @@ function write_loop(client)
             write(client.socket, data)
         end
     catch e
+        # channel closed
         if isa(e, InvalidStateException)
-            # channel closed
             close(client.socket)
         else
             rethrow()
