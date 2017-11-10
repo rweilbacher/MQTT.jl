@@ -1,7 +1,7 @@
 using MQTT
 using Base.Test
 
-info("Running basic tests")
+info("Running smoke tests")
 
 condition = Condition()
 topic = randstring(20)
@@ -32,5 +32,3 @@ publish(client, topic, payload, qos=0x02)
 wait(condition)
 
 disconnect(client)
-
-info("Basic tests finished")
