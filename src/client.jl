@@ -317,26 +317,6 @@ function unsubscribe(client, topics...)
     return get(future)
 end
 
-#TODO make parameters easier to use. For example no b"QOS_1"
-function publish(client::Client, topic::String, payload...;
-    dup::Bool=false,
-    qos::UInt8=0x00,
-    retain::Bool=false)
-
-    message = Message(dup, qos, retain, topic, payload...)
-    future = publish_async(client, message)
-    get(future)
-end
-
-function publish_async(client::Client, topic::String, payload...;
-    dup::Bool=false,
-    qos::UInt8=0x00,
-    retain::Bool=false)
-
-    message = Message(dup, qos, retain, topic, payload...)
-    publish_async(client, message)
-end
-
 function publish_async(client::Client, message::Message)
     future = Future()
     optional = ()
@@ -353,4 +333,18 @@ function publish_async(client::Client, message::Message)
     cmd = PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
     write_packet(client, cmd, message.topic, optional..., message.payload)
     return future
+end
+
+function publish_async(client::Client, topic::String, payload...;
+    dup::Bool=false,
+    qos::UInt8=0x00,
+    retain::Bool=false)
+    return publish_async(client, Message(dup, qos, retain, topic, payload...))
+end
+
+function publish(client::Client, topic::String, payload...;
+    dup::Bool=false,
+    qos::UInt8=0x00,
+    retain::Bool=false)
+    get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
 end
