@@ -230,7 +230,16 @@ end
 
 function keep_alive_loop(client::Client)
     while true
-      write_packet(client, PINGREQ) # TODO test if this leads to time issues and put a socket mutex and write here directly if it does
+      try
+        write_packet(client, PINGREQ) # TODO test if this leads to time issues and put a socket mutex and write here directly if it does
+      catch e
+        if isa(e, InvalidStateException)
+          # A disconnect has happened -> Stop the loop
+          break;
+        else
+          rethrow()
+        end
+      end
       sleep(client.keep_alive)
 
       if client.received_pingresp == false

@@ -69,7 +69,7 @@ function test()
     put_from_file(tfh, "data/input/pingresp.dat")
 
     info("Testing keep alive without response")
-    sleep(2)
+    sleep(1.1)
     @test is_out_correct("data/output/pingreq.dat", tfh.out_channel)
     @test is_out_correct("data/output/disco.dat", tfh.out_channel)
 
