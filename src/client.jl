@@ -67,13 +67,16 @@ mutable struct Client
     write_packets::Channel{Packet}
     socket
 
+    received_pingresp::Bool
+
     Client(on_msg) = new(
     on_msg,
     0x0000,
     0x0000,
     Dict{UInt16, Future}(),
     Channel{Packet}(60),
-    TCPSocket())
+    TCPSocket(),
+    false)
 end
 
 const CONNACK_STRINGS = [
@@ -90,6 +93,9 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
 
     future = client.in_flight[0x0000]
     if return_code == CONNECTION_ACCEPTED
+        if client.keep_alive > 0x0000
+          @schedule keep_alive_loop(client)
+        end
         put!(future, session_present)
     else
         try
@@ -126,6 +132,7 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     @schedule client.on_msg(topic, payload)
 end
 
+#TODO what kind of ack?
 function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
     put!(client.in_flight[id], nothing)
@@ -143,12 +150,13 @@ function handle_suback(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     put!(client.in_flight[id], return_codes)
 end
 
-function handle_pingreq(client::Client, s::IO, cmd::UInt8, flags::UInt8)
-    # TODO
-end
-
 function handle_pingresp(client::Client, s::IO, cmd::UInt8, flags::UInt8)
-    # TODO
+    if client.received_pingresp == false
+      client.received_pingresp = true
+    else
+      # We received a subresp packet we didn't ask for
+      disconnect(client)
+    end
 end
 
 const handlers = Dict{UInt8, Function}(
@@ -160,7 +168,6 @@ PUBREL => handle_pubrecrel,
 PUBCOMP => handle_ack,
 SUBACK => handle_suback,
 UNSUBACK => handle_ack,
-PINGREQ => handle_pingreq,
 PINGRESP => handle_pingresp
 )
 
@@ -217,10 +224,18 @@ function read_loop(client)
     end
 end
 
-function ping_loop(client::Client)
+function keep_alive_loop(client::Client)
     while true
-        # sleep(client.keep_alive)
-        # TODO ping
+      write_packet(client, PINGREQ) # TODO test if this leads to time issues and put a socket mutex and write here directly if it does
+      sleep(client.keep_alive)
+
+      if client.received_pingresp == false
+        # No pingresp received
+        disconnect(client)
+        #TODO automatic reconnect
+      else
+        client.received_pingresp = false
+      end
     end
 end
 
@@ -238,6 +253,7 @@ function get(future)
     return r
 end
 
+#TODO change keep_alive to Int64 and convert ourselves
 function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     keep_alive::UInt16=0x0000,
     client_id::String=randstring(8),
@@ -245,9 +261,12 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
     clean_session::Bool=true)
 
+    client.keep_alive = keep_alive
     client.socket = connect(host, port)
     @schedule write_loop(client)
     @schedule read_loop(client)
+
+    #TODO reset client on clean_session = false
 
     protocol_name = "MQTT"
     protocol_level = 0x04
@@ -286,6 +305,7 @@ function disconnect(client)
     # TODO maybe close ourselves after timeout?
     # wait(client.socket.closenotify)
     # close(client.socket)
+
 end
 
 function subscribe_async(client, topics...)
