@@ -1,19 +1,4 @@
-include("testlib.jl")
-
-using MQTT
-import MQTT.Message
-using Base.Test
-
-# because of the way julia handles null its easier to link a client instance with one tcp connection
-# this could create problems in the future if you want to implement some reconnection for example
-
-function on_msg(topic, payload)
-    info("Received message topic: [", topic, "] payload: [", String(payload), "]")
-    @test topic == "abc"
-    @test String(payload) == "qwerty"
-end
-
-function is_out_correct(filename_expected::AbstractString, actual::Channel{UInt8})
+#=function is_out_correct(filename_expected::AbstractString, actual::Channel{UInt8})
     file = open(filename_expected, "r")
     correct = true
     while !eof(file)
@@ -22,17 +7,7 @@ function is_out_correct(filename_expected::AbstractString, actual::Channel{UInt8
             break
         end
     end
-    if isready(actual)
-        # There is still data in the output but no more in the file
-        #correct = false # TODO maybe correct has to be false?
-    end
     return correct
-end
-
-function consume_output(channel::Channel{UInt8})
-  while isready(channel)
-    take!(channel)
-  end
 end
 
 function test()
@@ -94,6 +69,7 @@ function test()
     put_from_file(tfh, "data/input/pingresp.dat")
     sleep(0.1)
     @test is_out_correct("data/output/disco.dat", tfh.out_channel)
-end
+end=#
 
-test()
+include("smoke.jl")
+include("packet.jl")

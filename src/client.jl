@@ -41,13 +41,13 @@ struct Message
     payload::Array{UInt8}
 
     function Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)
-      # Convert payload to UInt8 Array with PipeBuffer
-      buffer = PipeBuffer()
-      for i in payload
-          write(buffer, i)
-      end
-      encoded_payload = take!(buffer)
-      return new(dup, qos, retain, topic, encoded_payload)
+        # Convert payload to UInt8 Array with PipeBuffer
+        buffer = PipeBuffer()
+        for i in payload
+            write(buffer, i)
+        end
+        encoded_payload = take!(buffer)
+        return new(dup, qos, retain, topic, encoded_payload)
     end
 end
 
@@ -138,10 +138,14 @@ function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     put!(client.in_flight[id], nothing)
 end
 
-function handle_pubrecrel(client::Client, s::IO, cmd::UInt8, flags::UInt8)
+function handle_pubrec(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
-    # TODO cmd + 1 only works until we receive a packet we don't expect
-    write_packet(client, cmd + 1, id)
+    write_packet(client, PUBREL  | 0x02, id)
+end
+
+function handle_pubrel(client::Client, s::IO, cmd::UInt8, flags::UInt8)
+    id = mqtt_read(s, UInt16)
+    write_packet(client, PUBCOMP, id)
 end
 
 function handle_suback(client::Client, s::IO, cmd::UInt8, flags::UInt8)
@@ -163,8 +167,8 @@ const handlers = Dict{UInt8, Function}(
 CONNACK => handle_connack,
 PUBLISH => handle_publish,
 PUBACK => handle_ack,
-PUBREC => handle_pubrecrel,
-PUBREL => handle_pubrecrel,
+PUBREC => handle_pubrec,
+PUBREL => handle_pubrel,
 PUBCOMP => handle_ack,
 SUBACK => handle_suback,
 UNSUBACK => handle_ack,
@@ -194,8 +198,9 @@ function write_loop(client)
             write(client.socket, data)
         end
     catch e
+        # channel closed
         if isa(e, InvalidStateException)
-            info("write loop stopped '", e.msg, "'")
+            close(client.socket)
         else
             rethrow()
         end
@@ -216,9 +221,8 @@ function read_loop(client)
             handlers[cmd](client, buffer, cmd, flags)
         end
     catch e
-        if isa(e, EOFError)
-            info("read loop stopped")
-        else
+        # socket closed
+        if !isa(e, EOFError)
             rethrow()
         end
     end
@@ -302,10 +306,7 @@ clean_session::Bool=true) = get(connect_async(client, host, port, keep_alive=kee
 function disconnect(client)
     write_packet(client, DISCONNECT)
     close(client.write_packets)
-    # TODO maybe close ourselves after timeout?
-    # wait(client.socket.closenotify)
-    # close(client.socket)
-
+    wait(client.socket.closenotify)
 end
 
 function subscribe_async(client, topics...)
@@ -335,31 +336,11 @@ function unsubscribe(client, topics...)
     return get(future)
 end
 
-#TODO make parameters easier to use. For example no b"QOS_1"
-function publish(client::Client, topic::String, payload...;
-    dup::Bool=false,
-    qos::UInt8=0x00,
-    retain::Bool=false)
-
-    message = Message(dup, qos, retain, topic, payload...)
-    future = publish_async(client, message)
-    get(future)
-end
-
-function publish_async(client::Client, topic::String, payload...;
-    dup::Bool=false,
-    qos::UInt8=0x00,
-    retain::Bool=false)
-
-    message = Message(dup, qos, retain, topic, payload...)
-    publish_async(client, message)
-end
-
 function publish_async(client::Client, message::Message)
     future = Future()
     optional = ()
     if message.qos == 0x00
-        put!(future, nothing)
+        put!(future, 0)
     elseif message.qos == 0x01 || message.qos == 0x02
         future = Future()
         id = packet_id(client)
@@ -371,4 +352,18 @@ function publish_async(client::Client, message::Message)
     cmd = PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
     write_packet(client, cmd, message.topic, optional..., message.payload)
     return future
+end
+
+function publish_async(client::Client, topic::String, payload...;
+    dup::Bool=false,
+    qos::UInt8=0x00,
+    retain::Bool=false)
+    return publish_async(client, Message(dup, qos, retain, topic, payload...))
+end
+
+function publish(client::Client, topic::String, payload...;
+    dup::Bool=false,
+    qos::UInt8=0x00,
+    retain::Bool=false)
+    get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
 end
