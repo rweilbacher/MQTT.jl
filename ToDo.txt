@@ -5,8 +5,6 @@ Sprint 1:
 		separate handle_pubrecrel into two different methods and fix them
 	fix connect method (Alexander, Pia)
 		make it not hardcoded
-	ping/keepalive (Roland)
-		implement it
 	disconnect_async/disconnect (maybe Sprint 2) (Alex)
 		think about what we need to do and how
 		the reconnect should still work
@@ -18,7 +16,6 @@ Sprint 1:
 	Tests: (Nathan, Pia)
 		qos2 flow and package structure
 		connect variations
-		keepalive flow and package structure
 	
 Sprint 2:
 	implement clean session = false
