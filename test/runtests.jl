@@ -1,2 +1,2 @@
 include("smoke.jl")
-@suppress include("packet.jl")
+include("packet.jl")
