@@ -8,7 +8,7 @@ topic = randstring(20)
 payload = randstring(20)
 
 function on_msg(t, p)
-    info("Received message topic: [", topic, "] payload: [", String(payload), "]")
+    info("Received message topic: [", t, "] payload: [", String(p), "]")
     @test t == topic
     @test String(p)== payload
 
@@ -16,7 +16,12 @@ function on_msg(t, p)
 end
 
 client = Client(on_msg)
+
+info("Testing reconnect")
 connect(client, "test.mosquitto.org")
+disconnect(client)
+connect(client, "test.mosquitto.org")
+
 subscribe(client, topic, 0x00)
 
 info("Testing publish qos 0")

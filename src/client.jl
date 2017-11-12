@@ -274,6 +274,7 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
     clean_session::Bool=true)
 
+    client.write_packets = Channel{Packet}(client.write_packets.sz_max)
     client.keep_alive = keep_alive
     client.socket = connect(host, port)
     @schedule write_loop(client)
