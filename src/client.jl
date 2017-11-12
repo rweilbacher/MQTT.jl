@@ -93,9 +93,6 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
 
     future = client.in_flight[0x0000]
     if return_code == CONNECTION_ACCEPTED
-        if client.keep_alive > 0x0000
-          @schedule keep_alive_loop(client)
-        end
         put!(future, session_present)
     else
         try
@@ -279,7 +276,11 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     @schedule write_loop(client)
     @schedule read_loop(client)
 
-    #TODO reset client on clean_session = false
+    if client.keep_alive > 0x0000
+      @schedule keep_alive_loop(client)
+    end
+
+    #TODO reset client on clean_session = true
 
     protocol_name = "MQTT"
     protocol_level = 0x04
