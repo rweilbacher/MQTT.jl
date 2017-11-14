@@ -28,6 +28,9 @@ struct MQTTException <: Exception
     msg::AbstractString
 end
 
+struct MQTT_ERR_INVAL <: Exception
+end
+
 struct Packet
     cmd::UInt8
     data::Any
@@ -377,4 +380,26 @@ function publish(client::Client, topic::String, payload...;
     qos::UInt8=0x00,
     retain::Bool=false)
     get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
+    try
+      client.topic_wildcard_len_check(client.topic)
+    catch
+      error("Topic is invalid.")
+end
+
+# Helper method to check if it is possible to subscribe to a topic
+function filter_wildcard_len_check(sub)
+    #Regex: matches any valid topic, + and # are not in allowed in strings, + is only allowed as a single symbol between two /, # is only allowed at the end
+    if !(ismatch(r"(^[^#+]+|[+])(/([^#+]+|[+]))*(/#)?$", sub) || length(sub) > 65535)
+        throw(MQTT_ERR_INVAL())
+    end
+end
+
+# Helper method to check if it is possible to publish a topic
+function topic_wildcard_len_check(topic)
+    # Search for + or # in a topic. Return MQTT_ERR_INVAL if found.
+     # Also returns MQTT_ERR_INVAL if the topic string is too long.
+     # Returns MQTT_ERR_SUCCESS if everything is fine.
+    if !(ismatch(r"^[#+]+$", topic) || length(topic) > 65535
+        throw(MQTT_ERR_INVAL())
+    end
 end

@@ -9,9 +9,9 @@ Sprint 1:
 		think about what we need to do and how
 		the reconnect should still work
 	put handle methods to other file (Alexander, Pia)
-		ez pz
-	topic check into publish (Alexander, Pia)
-	include unit tests into runtests.jl (Alexander, Pia)
+		ez pz - done
+	topic check into publish (Alexander, Pia) - done
+	include unit tests into runtests.jl (Alexander, Pia) - done
 		
 	Tests: (Nathan, Pia)
 		qos2 flow and package structure
