@@ -129,10 +129,16 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     @schedule client.on_msg(topic, payload)
 end
 
-#TODO what kind of ack?
 function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
-    put!(client.in_flight[id], nothing)
+    # TODO move this to its own function
+    if haskey(client.in_flight, id)
+        future = client.in_flight[id]
+        put!(future, nothing)
+        delete!(client.in_flight, id)
+    else
+        # TODO unexpected ack protocol error
+    end
 end
 
 function handle_pubrec(client::Client, s::IO, cmd::UInt8, flags::UInt8)
@@ -242,7 +248,7 @@ function keep_alive_loop(client::Client)
       if client.received_pingresp == false
         # No pingresp received
         disconnect(client)
-        #TODO automatic reconnect
+        # TODO automatic reconnect
       else
         client.received_pingresp = false
       end

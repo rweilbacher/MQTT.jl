@@ -1,3 +1,9 @@
+protocol error handling
+reconnect
+persistence (in memory, files)
+improved keep_alive
+start documentation
+
 Sprint 1:
 	enums (Alexander, Pia)
 		look at enums and how to use them
@@ -12,11 +18,11 @@ Sprint 1:
 		ez pz
 	topic check into publish (Alexander, Pia)
 	include unit tests into runtests.jl (Alexander, Pia)
-		
+
 	Tests: (Nathan, Pia)
 		qos2 flow and package structure
 		connect variations
-	
+
 Sprint 2:
 	implement clean session = false
 		work out what we need
