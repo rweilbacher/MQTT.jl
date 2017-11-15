@@ -79,13 +79,13 @@ mutable struct Client
     false)
 end
 
-const CONNACK_STRINGS = [
-"connection refused unacceptable protocol version",
-"connection refused identifier rejected",
-"connection refused server unavailable",
-"connection refused bad user name or password",
-"connection refused not authorized",
-]
+const CONNACK_ERRORS = Dict{UInt8, String}(
+0x01 => "connection refused unacceptable protocol version",
+0x02 => "connection refused identifier rejected",
+0x03 => "connection refused server unavailable",
+0x04 => "connection refused bad user name or password",
+0x05 => "connection refused not authorized",
+)
 
 function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     session_present = read(s, UInt8)
@@ -95,16 +95,8 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     if return_code == CONNECTION_ACCEPTED
         put!(future, session_present)
     else
-        try
-            put!(future, MQTTException(CONNACK_STRINGS[return_code]))
-        catch e
-            if isa(e, BoundsError)
-                put!(future, MQTTException("unkown return code [" + return_code + "]"))
-                # TODO close connection
-            else
-                rethrow()
-            end
-        end
+        error = get(CONNACK_ERRORS, return_code, "unkown return code [" + return_code + "]")
+        put!(future, MQTTException(error))
     end
 end
 
@@ -166,7 +158,7 @@ function handle_pingresp(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     end
 end
 
-const handlers = Dict{UInt8, Function}(
+const HANDLERS = Dict{UInt8, Function}(
 CONNACK => handle_connack,
 PUBLISH => handle_publish,
 PUBACK => handle_ack,
@@ -219,9 +211,12 @@ function read_loop(client)
             buffer = PipeBuffer(data)
             cmd = cmd_flags & 0xF0
             flags = cmd_flags & 0x0F
-            # TODO check contains
-            # TODO handle errors
-            handlers[cmd](client, buffer, cmd, flags)
+
+            if haskey(HANDLERS, cmd)
+                HANDLERS[cmd](client, buffer, cmd, flags)
+            else
+                # TODO unexpected cmd protocol error
+            end
         end
     catch e
         # socket closed
