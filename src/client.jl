@@ -321,6 +321,7 @@ function disconnect(client)
     wait(client.socket.closenotify)
 end
 
+# TODO change topics to Tuple{String, UInt8}
 function subscribe_async(client, topics...)
     future = Future()
     id = packet_id(client)
@@ -329,11 +330,7 @@ function subscribe_async(client, topics...)
     return future
 end
 
-# TODO change topics to Tuple{String, UInt8}
-function subscribe(client, topics...)
-    future = subscribe_async(client, topics...)
-    return get(future)
-end
+subscribe(client, topics...) = get(subscribe_async(client, topics...))
 
 function unsubscribe_async(client, topics...)
     future = Future()
@@ -343,10 +340,7 @@ function unsubscribe_async(client, topics...)
     return future
 end
 
-function unsubscribe(client, topics...)
-    future = unsubscribe_async(client, topics...)
-    return get(future)
-end
+unsubscribe(client, topics...) = get(unsubscribe_async(client, topics...))
 
 function publish_async(client::Client, message::Message)
     future = Future()
@@ -366,16 +360,12 @@ function publish_async(client::Client, message::Message)
     return future
 end
 
-function publish_async(client::Client, topic::String, payload...;
+publish_async(client::Client, topic::String, payload...;
     dup::Bool=false,
     qos::UInt8=0x00,
-    retain::Bool=false)
-    return publish_async(client, Message(dup, qos, retain, topic, payload...))
-end
+    retain::Bool=false) = publish_async(client, Message(dup, qos, retain, topic, payload...))
 
-function publish(client::Client, topic::String, payload...;
+publish(client::Client, topic::String, payload...;
     dup::Bool=false,
     qos::UInt8=0x00,
-    retain::Bool=false)
-    get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
-end
+    retain::Bool=false) = get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
