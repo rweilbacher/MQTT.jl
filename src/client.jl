@@ -268,14 +268,18 @@ end
 
 #TODO change keep_alive to Int64 and convert ourselves
 function connect_async(client::Client, host::AbstractString, port::Integer=1883;
-    keep_alive::UInt16=0x0000,
+    keep_alive::Int64=0,
     client_id::String=randstring(8),
     user::User=User("", ""),
     will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
     clean_session::Bool=true)
 
     client.write_packets = Channel{Packet}(client.write_packets.sz_max)
-    client.keep_alive = keep_alive
+    try
+        client.keep_alive = convert(UInt16, keep_alive)
+    catch
+        error("Could not convert keep_alive to UInt16")
+    end
     client.socket = connect(host, port)
     @schedule write_loop(client)
     @schedule read_loop(client)
@@ -293,7 +297,8 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     optional = ()
 
     if length(will.topic) > 0
-        # TODO
+        optional = (will.topic, will.qos, will.payload, will.retain)
+        connect_flags = connect_flags | 0x04
     end
 
     future = Future()
@@ -311,7 +316,7 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
 end
 
 connect(client::Client, host::AbstractString, port::Integer=1883;
-keep_alive::UInt16=0x0000,
+keep_alive::Int64=0,
 client_id::String=randstring(8),
 user::User=User("", ""),
 will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
