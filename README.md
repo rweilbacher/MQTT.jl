@@ -5,6 +5,13 @@
 
 MQTT Client Library
 
+## How to install
+#### Using Julia's package manager 
+```julia
+Pkg.clone("https://github.com/kivaari/MQTT.jl.git")
+Pkg.test("MQTT")
+```
+#### Manually
 ```julia
 # Add the src folder to the load path inside the .juliarc.jl
 push!(LOAD_PATH, "~/MQTT.jl/src")
@@ -13,9 +20,4 @@ push!(LOAD_PATH, "~/MQTT.jl/src")
 ```sh
 # Run runtests.jl inside the test dir
 ~/MQTT.jl/test/$ julia runtests.jl
-```
-
-```julia
-Pkg.clone("https://github.com/kivaari/MQTT.jl.git")
-Pkg.test("MQTT")
 ```

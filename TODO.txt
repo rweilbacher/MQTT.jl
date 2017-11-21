@@ -1,7 +1,6 @@
 protocol error handling
 reconnect
 persistence (in memory, files)
-improved keep_alive
 start documentation
 
 Sprint 1:
