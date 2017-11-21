@@ -1,4 +1,5 @@
-import Base.connect
+import Base: connect, Dates.second, ReentrantLock, lock, unlock
+importall Base.Threads
 
 # commands
 const CONNECT = 0x10
@@ -66,8 +67,14 @@ mutable struct Client
 
     write_packets::Channel{Packet}
     socket
+    socket_lock
 
-    received_pingresp::Bool
+    ping_timeout::UInt64
+
+    # TODO mutex
+    ping_outstanding::Atomic{UInt8}
+    last_sent::Atomic{Float64}
+    last_received::Atomic{Float64}
 
     Client(on_msg) = new(
     on_msg,
@@ -76,7 +83,11 @@ mutable struct Client
     Dict{UInt16, Future}(),
     Channel{Packet}(60),
     TCPSocket(),
-    false)
+    ReentrantLock(),
+    60,
+    Atomic{UInt8}(0),
+    Atomic{Float64}(),
+    Atomic{Float64}())
 end
 
 const CONNACK_ERRORS = Dict{UInt8, String}(
@@ -150,8 +161,8 @@ function handle_suback(client::Client, s::IO, cmd::UInt8, flags::UInt8)
 end
 
 function handle_pingresp(client::Client, s::IO, cmd::UInt8, flags::UInt8)
-    if client.received_pingresp == false
-      client.received_pingresp = true
+    if client.ping_outstanding[] == 0x1
+      atomic_xchg!(client.ping_outstanding, 0x0)
     else
       # We received a subresp packet we didn't ask for
       disconnect(client)
@@ -188,9 +199,12 @@ function write_loop(client)
                 mqtt_write(buffer, i)
             end
             data = take!(buffer)
+            lock(client.socket_lock)
             write(client.socket, packet.cmd)
             write_len(client.socket, length(data))
             write(client.socket, data)
+            unlock(client.socket_lock)
+            atomic_xchg!(client.last_sent, time())
         end
     catch e
         # channel closed
@@ -213,6 +227,7 @@ function read_loop(client)
             flags = cmd_flags & 0x0F
 
             if haskey(HANDLERS, cmd)
+                atomic_xchg!(client.last_received, time())
                 HANDLERS[cmd](client, buffer, cmd, flags)
             else
                 # TODO unexpected cmd protocol error
@@ -227,26 +242,53 @@ function read_loop(client)
 end
 
 function keep_alive_loop(client::Client)
+    ping_sent = time()
+
+    if client.keep_alive > 10
+      check_interval = 5
+    else
+      check_interval = client.keep_alive / 2
+    end
+    timer = Timer(0, check_interval)
+
     while true
-      try
-        write_packet(client, PINGREQ) # TODO test if this leads to time issues and put a socket mutex and write here directly if it does
-      catch e
-        if isa(e, InvalidStateException)
-          # A disconnect has happened -> Stop the loop
-          break;
-        else
-          rethrow()
+      if time() - client.last_sent[] >= client.keep_alive || time() - client.last_received[] >= client.keep_alive
+        if client.ping_outstanding[] == 0x0
+          atomic_xchg!(client.ping_outstanding, 0x1)
+          try
+            lock(client.socket_lock)
+            write(client.socket, PINGREQ)
+            write(client.socket, 0x00)
+            unlock(client.socket_lock)
+            atomic_xchg!(client.last_sent, time())
+          catch e
+              if isa(e, InvalidStateException)
+                  break
+                  # TODO is this the socket closed exception? Handle accordingly
+              else
+                  rethrow()
+              end
+          end
+          ping_sent = time()
         end
       end
-      sleep(client.keep_alive)
 
-      if client.received_pingresp == false
-        # No pingresp received
-        disconnect(client)
+      if client.ping_outstanding[] == 1 && time() - ping_sent >= client.ping_timeout
+        try # No pingresp received
+          disconnect(client)
+          break
+        catch e
+            # channel closed
+            if isa(e, InvalidStateException)
+                break
+            else
+                rethrow()
+            end
+        end
         # TODO automatic reconnect
-      else
-        client.received_pingresp = false
       end
+
+      wait(timer)
     end
 end
 

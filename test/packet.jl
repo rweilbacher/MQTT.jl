@@ -62,6 +62,7 @@ function test()
     #This has to be in it's own connect flow to not interfere with other messages
     info("Testing keep alive with response")
     client = Client(on_msg)
+    client.ping_timeout = 1
     connect(client, "test.mosquitto.org", client_id="TestID", keep_alive=0x0001)
     tfh = client.socket
     @test is_out_correct("data/output/connect_keep_alive1s.dat", tfh.out_channel) # Consume output
@@ -77,12 +78,9 @@ function test()
     client = Client(on_msg)
     connect(client, "test.mosquitto.org", client_id="TestID", keep_alive=0x000F)
     tfh = client.socket
-    @test is_out_correct("data/output/connect_keep_alive15s.dat", tfh.out_channel) # Consume output
-    @test is_out_correct("data/output/pingreq.dat", tfh.out_channel)
-    put_from_file(tfh, "data/input/pingresp.dat")
     put_from_file(tfh, "data/input/pingresp.dat")
     sleep(0.1)
-    @test is_out_correct("data/output/disco.dat", tfh.out_channel)
+    @test tfh.closed
 end
 
 test()
