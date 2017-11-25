@@ -1,10 +1,12 @@
 using MQTT
 using Base.Test
+import MQTT: Message
+import MQTT: User
 
 info("Running smoke tests")
 
 condition = Condition()
-topic = randstring(20)
+topic = "foo"
 payload = randstring(20)
 
 function on_msg(t, p)
@@ -35,5 +37,14 @@ wait(condition)
 info("Testing publish qos 2")
 publish(client, topic, payload, qos=0x02)
 wait(condition)
+
+info("Testing connect will")
+disconnect(client)
+connect(client, "test.mosquitto.org", will=Message(false, 0x00, false, topic, payload))
+
+info("Testing connect with user name an pasword")
+disconnect(client)
+connect(client, "test.mosquitto.org", user=User("user", "1234"))
+
 
 disconnect(client)

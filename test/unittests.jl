@@ -1,7 +1,10 @@
 using Base.Test
+using MQTT
+import MQTT: topic_wildcard_len_check, filter_wildcard_len_check
+
 @testset "topic_wildcard_len_check" begin
     @test_throws MQTT_ERR_INVAL topic_wildcard_len_check("+")
-    @test topic_wildcard_len_check("bar") == nothing
+    @test topic_wildcard_len_check("foo") == nothing
     @test_throws MQTT_ERR_INVAL topic_wildcard_len_check("#")
     @test_throws MQTT_ERR_INVAL topic_wildcard_len_check("")
 end;

@@ -294,11 +294,20 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     protocol_level = 0x04
     connect_flags = 0x02 # clean session
 
-    optional = ()
+    optional_user = ()
+    optional_will = ()
+
+    if length(user.name) > 0 && length(user.password) > 0
+        connect_flags |= 0xC0
+        optional_user = (user.name, user.password)
+    elseif length(user.name) > 0
+        connect_flags |= 0x80
+        optional_user = (user.name)
+    end
 
     if length(will.topic) > 0
-        optional = (will.topic, will.qos, will.payload, will.retain)
-        connect_flags = connect_flags | 0x04
+        optional_will = (will.topic, convert(UInt16, length(will.payload)), will.payload)
+        connect_flags |= 0x04 | ((will.qos & 0x03) << 3) | ((will.retain & 0x01) << 5)
     end
 
     future = Future()
@@ -310,7 +319,8 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     connect_flags,
     client.keep_alive,
     client_id,
-    optional...)
+    optional_user...,
+    optional_will...)
 
     return future
 end
@@ -377,6 +387,7 @@ function publish_async(client::Client, topic::String, payload...;
     dup::Bool=false,
     qos::UInt8=0x00,
     retain::Bool=false)
+
     return publish_async(client, Message(dup, qos, retain, topic, payload...))
 end
 
@@ -384,17 +395,19 @@ function publish(client::Client, topic::String, payload...;
     dup::Bool=false,
     qos::UInt8=0x00,
     retain::Bool=false)
-    get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
     try
-      client.topic_wildcard_len_check(client.topic)
+      topic_wildcard_len_check(topic)
     catch
       error("Topic is invalid.")
+    end
+    get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
+
 end
 
 # Helper method to check if it is possible to subscribe to a topic
 function filter_wildcard_len_check(sub)
     #Regex: matches any valid topic, + and # are not in allowed in strings, + is only allowed as a single symbol between two /, # is only allowed at the end
-    if !(ismatch(r"(^[^#+]+|[+])(/([^#+]+|[+]))*(/#)?$", sub) || length(sub) > 65535)
+    if !(ismatch(r"(^[^#+]+|[+])(/([^#+]+|[+]))*(/#)?$", sub)) || length(sub) > 65535
         throw(MQTT_ERR_INVAL())
     end
 end
@@ -404,7 +417,7 @@ function topic_wildcard_len_check(topic)
     # Search for + or # in a topic. Return MQTT_ERR_INVAL if found.
      # Also returns MQTT_ERR_INVAL if the topic string is too long.
      # Returns MQTT_ERR_SUCCESS if everything is fine.
-    if !(ismatch(r"^[#+]+$", topic) || length(topic) > 65535
+    if !(ismatch(r"^[^#+]+$", topic)) || length(topic) > 65535
         throw(MQTT_ERR_INVAL())
     end
 end
