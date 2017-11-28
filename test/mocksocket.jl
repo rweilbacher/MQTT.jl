@@ -39,8 +39,23 @@ function put(fh::TestFileHandler, data::Array{UInt8})
     end
 end
 
+function put(fh::TestFileHandler, data::UInt8)
+  put!(fh.in_channel, data)
+end
+
 function put_from_file(fh::TestFileHandler, filename)
     put(fh, read_all_to_arr(filename))
+end
+
+function put_from_file(fh::TestFileHandler, filename, messageId)
+  data = read_all_to_arr(filename)
+  if data[1] == CONNACK || data[1] == PINGRESP || data[1] == DISCONNECT
+    put(fh, data)
+  elseif data[1] == PUBLISH
+    
+  else
+  end
+
 end
 
 function read_all_to_arr(filename)
