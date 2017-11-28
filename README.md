@@ -1,14 +1,14 @@
 # MQTT.jl
 
-[![Build Status](https://travis-ci.org/kivaari/MQTT.jl.svg?branch=master)](https://travis-ci.org/kivaari/MQTT.jl)
-[![Coverage Status](https://coveralls.io/repos/github/kivaari/MQTT.jl/badge.svg?branch=master)](https://coveralls.io/github/kivaari/MQTT.jl?branch=master)
+[![Build Status](https://travis-ci.org/rweilbacher/MQTT.jl.svg?branch=master)](https://travis-ci.org/rweilbacher/MQTT.jl)
+[![Coverage Status](https://coveralls.io/repos/github/rweilbacher/MQTT.jl/badge.svg?branch=master)](https://coveralls.io/github/rweilbacher/MQTT.jl?branch=master)
 
 MQTT Client Library
 
-## How to install
+## How to install and test
 #### Using Julia's package manager 
 ```julia
-Pkg.clone("https://github.com/kivaari/MQTT.jl.git")
+Pkg.clone("https://github.com/rweilbacher/MQTT.jl.git")
 Pkg.test("MQTT")
 ```
 #### Manually
