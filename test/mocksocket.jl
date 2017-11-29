@@ -1,6 +1,3 @@
-import Base: connect, read, write, close
-import MQTT.read_len
-
 # commands
 const CONNECT = 0x10
 const CONNACK = 0x20

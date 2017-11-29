@@ -1,6 +1,3 @@
-import Base: connect, Dates.second, ReentrantLock, lock, unlock
-importall Base.Threads
-
 # commands
 const CONNECT = 0x10
 const CONNACK = 0x20

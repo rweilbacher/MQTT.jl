@@ -1,6 +1,3 @@
-using MQTT
-using Base.Test
-
 info("Running smoke tests")
 
 condition = Condition()

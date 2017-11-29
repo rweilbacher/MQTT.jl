@@ -1,5 +1,8 @@
 module MQTT
 
+import Base: connect, ReentrantLock, lock, unlock
+using Base.Threads, Base.Dates
+
 include("utils.jl")
 include("client.jl")
 

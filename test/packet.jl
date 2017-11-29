@@ -1,10 +1,4 @@
-include("mocksocket.jl")
-
 info("Running packet tests")
-
-using MQTT
-import MQTT.Message
-using Base.Test
 
 function on_msg(topic, payload)
     info("Received message topic: [", topic, "] payload: [", String(payload), "]")
