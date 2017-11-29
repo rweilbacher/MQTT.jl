@@ -7,7 +7,7 @@ end
 function write(s::IO, packet::Unsubscribe)
 end
 
-Base.show(io::IO, x::Subscribe) = print(io, "UNSUBSCRIBE[]")
+Base.show(io::IO, x::Unsubscribe) = print(io, "UNSUBSCRIBE[]")
 
 struct Unsuback <: Ack
     header::UInt8
