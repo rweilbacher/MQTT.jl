@@ -73,7 +73,7 @@ mutable struct Client
     last_sent::Atomic{Float64}
     last_received::Atomic{Float64}
 
-    Client(on_msg) = new(
+    Client(on_msg::Function) = new(
     on_msg,
     0x0000,
     0x0000,
@@ -82,6 +82,19 @@ mutable struct Client
     TCPSocket(),
     ReentrantLock(),
     60,
+    Atomic{UInt8}(0),
+    Atomic{Float64}(),
+    Atomic{Float64}())
+
+    Client(on_msg::Function, ping_timeout::UInt64) = new(
+    on_msg,
+    0x0000,
+    0x0000,
+    Dict{UInt16, Future}(),
+    Channel{Packet}(60),
+    TCPSocket(),
+    ReentrantLock(),
+    ping_timeout,
     Atomic{UInt8}(0),
     Atomic{Float64}(),
     Atomic{Float64}())
