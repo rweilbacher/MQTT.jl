@@ -19,18 +19,18 @@ connect(client, "test.mosquitto.org")
 disconnect(client)
 connect(client, "test.mosquitto.org")
 
-subscribe(client, topic, 0x00)
+subscribe(client, (topic, QOS_0))
 
 info("Testing publish qos 0")
-publish(client, topic, payload, qos=0x00)
+publish(client, topic, payload, qos=QOS_0)
 wait(condition)
 
 info("Testing publish qos 1")
-publish(client, topic, payload, qos=0x01)
+publish(client, topic, payload, qos=QOS_1)
 wait(condition)
 
 info("Testing publish qos 2")
-publish(client, topic, payload, qos=0x02)
+publish(client, topic, payload, qos=QOS_2)
 wait(condition)
 
 disconnect(client)

@@ -13,8 +13,8 @@ const UNSUBACK = 0xB0
 const PINGREQ = 0xC0
 const PINGRESP = 0xD0
 const DISCONNECT = 0xE0
-const QOS_1 = 0x02
-const QOS_2 = 0x04
+const QOS_1_BYTE = 0x02
+const QOS_2_BYTE = 0x04
 
 mutable struct TestFileHandler <: IO
     out_channel::Channel{UInt8}
@@ -81,7 +81,7 @@ function get_mid_index(data::Array{UInt8})
     return -1
   elseif cmd == PUBLISH
     qos = data[1] & 0x06
-    if qos == QOS_1 || qos == QOS_2
+    if qos == QOS_1_BYTE || qos == QOS_2_BYTE
       buffer = PipeBuffer()
       write(buffer, data[4])
       write(buffer, data[3])

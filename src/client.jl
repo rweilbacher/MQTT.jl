@@ -14,6 +14,11 @@ const PINGREQ = 0xC0
 const PINGRESP = 0xD0
 const DISCONNECT = 0xE0
 
+@enum(QOS::UInt8,
+    QOS_0 = 0x00,
+    QOS_1 = 0x01,
+    QOS_2 = 0x02)
+
 # connect return code
 const CONNECTION_ACCEPTED = 0x00
 const CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION = 0x01
@@ -99,6 +104,8 @@ mutable struct Client
     Atomic{Float64}(),
     Atomic{Float64}())
 end
+
+
 
 const CONNACK_ERRORS = Dict{UInt8, String}(
 0x01 => "connection refused unacceptable protocol version",
@@ -374,25 +381,32 @@ function disconnect(client)
 end
 
 # TODO change topics to Tuple{String, UInt8}
-function subscribe_async(client, topics...)
+function subscribe_async(client, topics::Tuple{String, QOS}...)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
-    write_packet(client, SUBSCRIBE | 0x02, id, topics...)
+    topic_data = []
+    for t in topics
+        for data in t
+            push!(topic_data, data)
+        end
+    end
+    write_packet(client, SUBSCRIBE | 0x02, id, topic_data...)
     return future
 end
 
-subscribe(client, topics...) = get(subscribe_async(client, topics...))
+subscribe(client, topics::Tuple{String, QOS}...) = get(subscribe_async(client, topics...))
 
-function unsubscribe_async(client, topics...)
+function unsubscribe_async(client, topics::String...)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
+    topic_data = []
     write_packet(client, UNSUBSCRIBE | 0x02, id, topics...)
     return future
 end
 
-unsubscribe(client, topics...) = get(unsubscribe_async(client, topics...))
+unsubscribe(client, topics::String...) = get(unsubscribe_async(client, topics...))
 
 function publish_async(client::Client, message::Message)
     future = Future()
@@ -414,10 +428,10 @@ end
 
 publish_async(client::Client, topic::String, payload...;
     dup::Bool=false,
-    qos::UInt8=0x00,
-    retain::Bool=false) = publish_async(client, Message(dup, qos, retain, topic, payload...))
+    qos::QOS=QOS_0,
+    retain::Bool=false) = publish_async(client, Message(dup, convert(UInt8, qos), retain, topic, payload...))
 
 publish(client::Client, topic::String, payload...;
     dup::Bool=false,
-    qos::UInt8=0x00,
+    qos::QOS=QOS_0,
     retain::Bool=false) = get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))

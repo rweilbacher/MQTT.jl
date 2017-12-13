@@ -8,6 +8,9 @@ include("client.jl")
 
 export
     Client,
+    QOS_0,
+    QOS_1,
+    QOS_2,
     connect_async,
     connect,
     subscribe_async,

@@ -58,7 +58,7 @@ function test()
     # CONNACK is automatically being sent in connect call
 
     info("Testing subscribe")
-    subscribe_async(client, "abc", 0x01, "cba", 0x00)
+    subscribe_async(client, ("abc", QOS_1), ("cba", QOS_0))
     put_from_file(tfh, "data/input/suback.dat", client.last_id)
     @test is_out_correct("data/output/subreq.dat", tfh.out_channel, client.last_id)
 
@@ -83,17 +83,17 @@ function test()
     #last_id += 1
 
     info("Testing send publish QOS 0")
-    publish_async(client, "test1", "QOS_0", qos=0x00)
+    publish_async(client, "test1", "QOS_0", qos=QOS_0)
     @test is_out_correct("data/output/qos0pub.dat", tfh.out_channel)
 
     info("Testing send publish QOS 1")
-    publish_async(client, "test2", "QOS_1", qos=0x01)
+    publish_async(client, "test2", "QOS_1", qos=QOS_1)
     put_from_file(tfh, "data/input/puback.dat", client.last_id)
     @test is_out_correct("data/output/qos1pub.dat", tfh.out_channel, client.last_id)
 
 
     info("Testing send publish QOS 2")
-    publish_async(client, "test3", "test", qos=0x02)
+    publish_async(client, "test3", "test", qos=QOS_2)
     @test is_out_correct("data/output/qos2pub.dat", tfh.out_channel, client.last_id)
     put_from_file(tfh, "data/input/pubrec.dat", client.last_id)
     @test is_out_correct("data/output/pubrel.dat", tfh.out_channel, client.last_id)
