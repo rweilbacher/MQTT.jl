@@ -43,6 +43,14 @@ struct Message
     topic::String
     payload::Array{UInt8}
 
+    function Message(qos::QOS, topic::String, payload...)
+        return Message(false, convert(UInt8, qos), false, topic, payload...)
+    end
+
+    function Message(dup::Bool, qos::QOS, retain::Bool, topic::String, payload...)
+        return Message(dup, convert(UInt8, qos), retain, topic, payload...)
+    end
+
     function Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)
         # Convert payload to UInt8 Array with PipeBuffer
         buffer = PipeBuffer()
@@ -374,14 +382,14 @@ user::User=User("", ""),
 will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
 clean_session::Bool=true) = get(connect_async(client, host, port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
 
-function disconnect(client)
+function disconnect(client::Client)
     write_packet(client, DISCONNECT)
     close(client.write_packets)
     wait(client.socket.closenotify)
 end
 
 # TODO change topics to Tuple{String, UInt8}
-function subscribe_async(client, topics::Tuple{String, QOS}...)
+function subscribe_async(client::Client, topics::Tuple{String, QOS}...)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
@@ -395,9 +403,9 @@ function subscribe_async(client, topics::Tuple{String, QOS}...)
     return future
 end
 
-subscribe(client, topics::Tuple{String, QOS}...) = get(subscribe_async(client, topics...))
+subscribe(client::Client, topics::Tuple{String, QOS}...) = get(subscribe_async(client, topics...))
 
-function unsubscribe_async(client, topics::String...)
+function unsubscribe_async(client::Client, topics::String...)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
@@ -406,7 +414,7 @@ function unsubscribe_async(client, topics::String...)
     return future
 end
 
-unsubscribe(client, topics::String...) = get(unsubscribe_async(client, topics...))
+unsubscribe(client::Client, topics::String...) = get(unsubscribe_async(client, topics...))
 
 function publish_async(client::Client, message::Message)
     future = Future()
