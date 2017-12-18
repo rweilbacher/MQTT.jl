@@ -11,8 +11,40 @@ This library supports: fully asynchronous operation, file persistence
 
 Contents
 --------
- * [Installation](#Installation)
- * [Publish](#Publish)
+ * [Installation](#installation)
+ * [Testing](#testing)
+ * [Usage](#usage)
+    * [Getting started](#getting-started)
+        * [Basic example](#basic-example)
+    * [Client struct](#client-struct)
+        * [Constructors](#constructors)
+    * [Message struct](#message-struct)
+        * [Constructors](#constructors-1)
+    * [Connect](#connect)
+        * [Arguments](#arguments)
+        * [Call example](#call-example)
+        * [Synchronous connect](#synchronous-connect)
+        * [Asynchronous connect](#asynchronous-connect)
+    * [Publish](#publish)
+        * [Arguments](#arguments-1)
+        * [Call example](#call-example-1)
+        * [Synchronous publish](#synchronous-publish)
+        * [Asynchronous publish](#asynchronous-publish)
+    * [Subscribe](#subscribe)
+        * [Arguments](#arguments-2)
+        * [Call example](#call-example-2)
+        * [Synchronous subscribe](#synchronous-subscribe)
+        * [Asynchronous subscribe](#asynchronous-subscribe)
+    * [Unsubscribe](#unsubscribe)
+        * [Arguments](#arguments-3)
+        * [Call example](#call-example-3)
+        * [Synchronous unsubscribe](#synchronous-unsubscribe)
+        * [Asynchronous unsubscribe](#asynchronous-unsubscribe)
+    * [Disconnect](#disconnect)
+        * [Arguments](#arguments-4)
+        * [Call example](#call-example-4)
+        * [Synchronous disconnect](#synchronous-disconnect)
+ * [Internal workings](#internal-workings)
 
 Installation
 ------------
@@ -119,6 +151,7 @@ function Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)
 
 Connects the `Client` instance to the specified broker. There is a synchronous and an asynchronous version available. Both versions take the same arguments.
 
+#### Arguments
 **Required arguments:**
 * **client**::Client: The client to connect to the broker.
 * **host**::AbstractString: The hostname or ip address of the broker.
@@ -167,6 +200,7 @@ clean_session::Bool=true)
 
 Publishes a message to the broker connected to the `Client` instance provided as a parameter. There is a synchronous and an asynchronous version available. Both versions take the same arguments.
 
+#### Arguments
 **Required arguments:**
 * **client**::Client: The client to send the message over.
 * **topic**::String: The topic to publish on. Normal rules for publish topics apply so "/ are allowed but no wildcards.
@@ -214,6 +248,7 @@ function publish_async(client::Client, topic::String, payload...;
 
 Subscribes the `Client` instance, provided as a parameter, to the specified topics. There is a synchronous and an asynchronous version available. Both versions take the same arguments.
 
+#### Arguments
 **Required arguments:**
 * **client**::Client: The connected client to subscribe on. TODO phrasing?
 * **topics**::Tuple{String, QOS}...: A variable amount of tuples that each have a String and a QOS constant.
@@ -243,6 +278,7 @@ function subscribe_async(client, topics::Tuple{String, QOS}...)
 
 This method unsubscribes the `Client` instance from the specified topics. There is a synchronous and an asynchronous version available. Both versions take the same arguments.
 
+#### Arguments
 **Required arguments:**
 * **client**::Client: The connected client to unsubscribe from the topics.
 * **topics**::String...: The `Tuple` of topics to unsubscribe from.
@@ -271,6 +307,7 @@ function unsubscribe_async(client::Client, topics::String...)
 
 Disconnects the `Client` instance gracefully, shuts down the background tasks and stores session state. There is only a synchronous version available.
 
+#### Arguments
 **Required arguments:**
 * **client**::Client: The client to disconnect.
 
