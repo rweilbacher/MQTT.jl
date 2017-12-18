@@ -11,7 +11,8 @@ This library supports: fully asynchronous operation, file persistence
 
 Contents
 --------
- TODO
+ * [Installation](#Installation)
+ * [Publish](#Publish)
 
 Installation
 ------------
@@ -107,7 +108,7 @@ This is the full `Message` constructor. It has all possible fields.
 function Message(dup::Bool, qos::QOS, retain::Bool, topic::String, payload...)
 ```
 
-This constructor is mostly for internal use as it converts the `QOS` enum to it's UInt8 equivalent for easier processing.
+This constructor is mostly for internal use. It uses the `UInt8` equivalent of the `QOS` enum for easier processing.
 
 ```julia
 function Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)
@@ -176,7 +177,7 @@ Publishes a message to the broker connected to the `Client` instance provided as
 * **qos**::QOS: The MQTT quality of service to use for the message. This has to be a QOS constant (QOS_0, QOS_1, QOS_2). ; *default = QOS_0*
 * **retain**::Bool: Whether or not the message should be retained by the broker. This means the broker sends it to all clients who subscribe to this topic ; *default = false*
 
-#### Example arguments
+#### Call example
 These are valid `payload...` examples.
 ```julia
 publish(c, "hello/world")
@@ -217,7 +218,7 @@ Subscribes the `Client` instance, provided as a parameter, to the specified topi
 * **client**::Client: The connected client to subscribe on. TODO phrasing?
 * **topics**::Tuple{String, QOS}...: A variable amount of tuples that each have a String and a QOS constant.
 
-#### Example arguments
+#### Call example
 This example subscribes to the topic "test" with QOS_2 and "test2" with QOS_0.
 ```julia
 subscribe(c, ("test", QOS_2), ("test2", QOS_0))
@@ -282,6 +283,14 @@ disconnect(c)
 ```julia
 function disconnect(client::Client))
 ```
+Internal workings
+-----------------
+It isn't necessary to read this section if you just want to use this library but it might give additional insight into how everything works.
 
-```julia
-```
+The `Client` instance has a `Channel`, called `write_packets`, to keep track of outbound messages that still need to be sent. Julia channels are basically just blocking queues so they have exactly the behavior we want.
+
+For storing messages that are awaiting acknowledgment, `Client` has a `Dict`, mapping message ids to `Future` instances. These futures get completed once the message has been completely acknowledged. There might then be information in the `Future` relevant to the specific message.
+
+Once the connect method is called on a `Client`, relevant fields are initialized and the julia `connect` method is called to get a connected socket. Then two background tasks are started that perpetually check for messages to send and receive. If `keep_alive` is non-zero another tasks get started that handles sending the keep alive and verifying the pingresp arrived in time.
+
+TODO explain read and write loop a bit

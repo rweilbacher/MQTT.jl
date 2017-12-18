@@ -77,11 +77,11 @@ mutable struct Client
 
     write_packets::Channel{Packet}
     socket
-    socket_lock
+    socket_lock # TODO add type
 
     ping_timeout::UInt64
 
-    # TODO mutex
+    # TODO remove atomic?
     ping_outstanding::Atomic{UInt8}
     last_sent::Atomic{Float64}
     last_received::Atomic{Float64}
