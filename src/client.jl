@@ -331,7 +331,24 @@ function get(future)
     return r
 end
 
-#TODO change keep_alive to Int64 and convert ourselves
+"""
+    connect_async(client::Client, host::AbstractString, port::Integer=1883;
+       keep_alive::UInt16=0x0000,
+       client_id::String=randstring(8),
+       user::User=User("", ""),
+       will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
+       clean_session::Bool=true)
+
+Connects the `Client` instance to the specified broker. 
+Returns a `Future` object that contains a session_present bit from the broker on success and an exception on failure.
+
+# Arguments
+- `keep_alive::Int64=0`: Time in seconds to wait before sending a ping to the broker if no other packets are being sent or received.
+- `client_id::String=randstring(8)`: The id of the client.
+- `user::User=User("", "")`: The MQTT authentication.
+- `will::Message=Message(false, 0x00, false, "", Array{UInt8}())`: The MQTT will to send to all other clients when this client disconnects.  
+- `clean_session::Bool=true`: Flag to resume a session with the broker if present.
+"""
 function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     keep_alive::UInt16=0x0000,
     client_id::String=randstring(8),
@@ -375,6 +392,24 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     return future
 end
 
+"""
+    connect(client::Client, host::AbstractString, port::Integer=1883;
+        keep_alive::UInt16=0x0000,
+        client_id::String=randstring(8),
+        user::User=User("", ""),
+        will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
+        clean_session::Bool=true)
+
+Connects the `Client` instance to the specified broker. 
+Waits until the connect is done. Returns the session_present bit from the broker on success and an exception on failure.
+
+# Arguments
+- `keep_alive::Int64=0`: Time in seconds to wait before sending a ping to the broker if no other packets are being sent or received.
+- `client_id::String=randstring(8)`: The id of the client.
+- `user::User=User("", "")`: The MQTT authentication.
+- `will::Message=Message(false, 0x00, false, "", Array{UInt8}())`: The MQTT will to send to all other clients when this client disconnects.  
+- `clean_session::Bool=true`: Flag to resume a session with the broker if present.
+"""
 connect(client::Client, host::AbstractString, port::Integer=1883;
 keep_alive::UInt16=0x0000,
 client_id::String=randstring(8),
@@ -382,13 +417,23 @@ user::User=User("", ""),
 will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
 clean_session::Bool=true) = get(connect_async(client, host, port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
 
+"""
+    disconnect(client::Client)
+
+Disconnects the client from the broker and stops the tasks.
+"""
 function disconnect(client::Client)
     write_packet(client, DISCONNECT)
     close(client.write_packets)
     wait(client.socket.closenotify)
 end
 
-# TODO change topics to Tuple{String, UInt8}
+"""
+    subscribe_async(client::Client, topics::Tuple{String, QOS}...)
+
+Subscribes the `Client` instance to the supplied topic tuples.
+Returns a `Future` object that contains the actually received QOS levels for each topic on success. Contains an exception on failure
+"""
 function subscribe_async(client::Client, topics::Tuple{String, QOS}...)
     future = Future()
     id = packet_id(client)
@@ -403,8 +448,20 @@ function subscribe_async(client::Client, topics::Tuple{String, QOS}...)
     return future
 end
 
+"""
+    subscribe(client::Client, topics::Tuple{String, QOS}...)
+
+Waits until the subscribe is fully acknowledged. Returns the actually received QOS levels for each topic on success. 
+Contains an exception on failure.
+"""
 subscribe(client::Client, topics::Tuple{String, QOS}...) = get(subscribe_async(client, topics...))
 
+"""
+    unsubscribe_async(client::Client, topics::String...)
+
+Unsubscribes the `Client` instance from the supplied topic names.
+Returns a `Future` object that contains `nothing` on success and an exception on failure. 
+"""
 function unsubscribe_async(client::Client, topics::String...)
     future = Future()
     id = packet_id(client)
@@ -414,8 +471,19 @@ function unsubscribe_async(client::Client, topics::String...)
     return future
 end
 
+"""
+    unsubscribe(client::Client, topics::String...) 
+
+Unsubscribes the `Client` instance from the supplied topic names.
+Waits until the unsubscribe is fully acknowledged. Returns `nothing` on success and an exception on failure.
+"""
 unsubscribe(client::Client, topics::String...) = get(unsubscribe_async(client, topics...))
 
+"""
+   publish_async(client::Client, message::Message)
+
+Publishes the message. Returns a `Future` object that contains `nothing` on success and an exception on failure. 
+"""
 function publish_async(client::Client, message::Message)
     future = Future()
     optional = ()
@@ -434,11 +502,27 @@ function publish_async(client::Client, message::Message)
     return future
 end
 
+"""
+    publish_async(client::Client, topic::String, payload...;
+       dup::Bool=false,
+       qos::QOS=QOS_0,
+       retain::Bool=false)
+
+Pulishes a message with the specified parameters. Returns a `Future` object that contains `nothing` on success and an exception on failure.  
+"""
 publish_async(client::Client, topic::String, payload...;
     dup::Bool=false,
     qos::QOS=QOS_0,
     retain::Bool=false) = publish_async(client, Message(dup, convert(UInt8, qos), retain, topic, payload...))
 
+"""
+   publish(client::Client, topic::String, payload...;
+      dup::Bool=false,
+      qos::QOS=QOS_0,
+      retain::Bool=false)
+
+ Waits until the publish is completely acknowledged. Publishes a message with the specified parameters. Returns `nothign` on success and throws an exception on failure.
+"""
 publish(client::Client, topic::String, payload...;
     dup::Bool=false,
     qos::QOS=QOS_0,
