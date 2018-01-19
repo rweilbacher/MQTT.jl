@@ -9,11 +9,8 @@ struct Connect <: Packet
     username::Nullable{String}
     password::Nullable{Array{UInt8}}
     id::UInt16
-
-    Connect(clean_session::Bool, keep_alive::UInt16, client_id::String, will::Nullable{Message}, username::Nullable{String}, password::Nullable{Array{UInt8}}) = new(CONNECT, "MQTT", 0x04, clean_session, keep_alive, client_id, will, username, password, 0)
 end
-
-Connect() = Connect(true, 0x0000, "", Nullable{Message}(), Nullable{String}(), Nullable{Array{UInt8}}())
+Connect(clean_session::Bool, keep_alive::UInt16, client_id::String, will::Nullable{Message}, username::Nullable{String}, password::Nullable{Array{UInt8}}) = Connect(CONNECT, "MQTT", 0x04, clean_session, keep_alive, client_id, will, username, password, 0)
 
 function write(s::IO, packet::Connect)
     mqtt_write(s, packet.protocol_name)
@@ -42,7 +39,7 @@ end
 
 has_id(packet::Connect) = true
 
-Base.show(io::IO, x::Connect) = print(io, "CONNECT[protocol_name: '", x.protocol_name, "'",
+Base.show(io::IO, x::Connect) = print(io, "connect[protocol_name: '", x.protocol_name, "'",
 ", protocol_level: ", x.protocol_level,
 ", clean_session: ", x.clean_session,
 ", keep_alive: ", x.keep_alive,
@@ -56,7 +53,6 @@ struct Connack <: Packet
     session_present::Bool
     return_code::UInt8
 end
-
 Connack(session_present::Bool, return_code::UInt8) = Connack(CONNACK, session_present, return_code)
 
 function read(s::IO, flags::UInt8, ::Type{Connack})
@@ -65,4 +61,4 @@ function read(s::IO, flags::UInt8, ::Type{Connack})
     return Connack(convert(Bool, session_present), return_code)
 end
 
-Base.show(io::IO, x::Connack) = print(io, "CONNACK[session_present: ", x.session_present, ", return_code: ", x.return_code ,"]")
+Base.show(io::IO, x::Connack) = print(io, "connack[session_present: ", x.session_present, ", return_code: ", x.return_code ,"]")

@@ -4,6 +4,23 @@ struct MQTTException <: Exception
     msg::AbstractString
 end
 
+"""
+    ConnectOpts(host, port=1883)
+Create a `ConnectOpts` using the given broker and default options.
+"""
+mutable struct ConnectOpts
+    clean_session::Bool
+    keep_alive::UInt16
+    client_id::String
+    will::Nullable{Message}
+    username::Nullable{String}
+    password::Nullable{Array{UInt8}}
+    io::IO
+end
+ConnectOpts(io::IO) = ConnectOpts(true, 0x0000, "", Nullable{Message}(), Nullable{String}(), Nullable{Array{UInt8}}(), io)
+ConnectOpts(host::AbstractString, port::Integer=1883) = ConnectOpts(connect(host, port))
+ConnectOpts() = ConnectOpts(TCPSocket())
+
 const CONNACK_ERRORS = [
 "connection refused unacceptable protocol version",
 "connection refused identifier rejected",
@@ -15,32 +32,29 @@ mutable struct Client
     on_msg::Function
     on_disconnect::Function
     ping_timeout::Int64
-
+    opts::ConnectOpts
     last_id::UInt16
     in_flight::Dict{UInt16, Future}
     queue::Channel{Tuple{Packet, Future}}
-    io::IO
+    disconnecting::Atomic{UInt8}
     last_sent::Atomic{Float64}
     last_received::Atomic{Float64}
     ping_outstanding::Atomic{UInt16}
-    connect_packet::Connect
     keep_alive_timer::Timer
-    disconnecting::Atomic{UInt8}
 
     Client(on_msg::Function, on_disconnect::Function, ping_timeout::Int64) = new(
     on_msg,
     on_disconnect,
     ping_timeout,
+    ConnectOpts(),
     0x0000,
     Dict{UInt16, Future}(),
     Channel{Tuple{Packet, Future}}(60),
-    TCPSocket(),
+    Atomic{UInt8}(0x00),
     Atomic{Float64}(),
     Atomic{Float64}(),
     Atomic{UInt16}(),
-    Connect(),
-    Timer(0, 0),
-    Atomic{UInt8}(0x00))
+    Timer(0, 0))
 end
 
 function packet_id(c::Client)
@@ -61,7 +75,12 @@ function complete(c::Client, id::UInt16, value=nothing)
     end
 end
 
-function get(future)
+"""
+    get(future)
+
+Connects the `Client` instance using the given options.
+"""
+function get(future::Future)
     r = fetch(future)
     if typeof(r) <: Exception
         throw(r)
@@ -69,44 +88,23 @@ function get(future)
     return r
 end
 
-function send_packet(c::Client, packet::Packet)
+function send_packet(c::Client, packet::Packet, async=false)
     future = Future()
     put!(c.queue, (packet, future))
-    return future
-end
-
-function connect(c::Client)
-    c.in_flight = Dict{UInt16, Future}()
-    c.queue = Channel{Tuple{Packet, Future}}(c.queue.sz_max)
-    @schedule out_loop(c)
-    @schedule in_loop(c)
-    if c.connect_packet.keep_alive > 0x0000
-        c.keep_alive_timer = keep_alive_timer(c)
-    end
-    get(send_packet(c, c.connect_packet))
-end
-
-function disconnect(c::Client, reason=nothing)
-    # ignore errors while disconnecting
-    if c.disconnecting[] == 0x00
-        atomic_xchg!(c.disconnecting, 0x01)
-        close(c.keep_alive_timer)
-        if !(typeof(reason) <: Exception)
-            get(send_packet(c, Disconnect()))
-        end
-        close(c.queue)
-        close(c.io)
-        c.on_disconnect(reason)
+    if async
+        return future
+    else
+        get(future)
     end
 end
 
 function in_loop(c::Client)
-    println("in loop started")
+    println("in started")
     try
         while true
-            packet = read_packet(c.io)
+            packet = read_packet(c.opts.io)
             atomic_xchg!(c.last_received, time())
-            println("<- ", packet)
+            println("in ", packet)
             handle(c, packet)
         end
     catch e
@@ -115,11 +113,11 @@ function in_loop(c::Client)
         end
         disconnect(c, e)
     end
-    println("in loop stopped")
+    println("in stopped")
 end
 
 function out_loop(c::Client)
-    println("out loop started")
+    println("out started")
     try
         while true
             packet, future = take!(c.queue)
@@ -133,8 +131,8 @@ function out_loop(c::Client)
                 c.in_flight[packet.id] = future
             end
             atomic_xchg!(c.last_sent, time())
-            write_packet(c.io, packet)
-            println("-> ", packet)
+            write_packet(c.opts.io, packet)
+            println("out ", packet)
             # complete the futures of packets that don't need acknowledgment
             if !has_id(packet)
                 put!(future, 0)
@@ -146,14 +144,14 @@ function out_loop(c::Client)
         end
         disconnect(c, e)
     end
-    println("out loop stopped")
+    println("out stopped")
 end
 
 function keep_alive_timer(c::Client)
-    check_interval = (c.connect_packet.keep_alive > 10) ? 5 : c.connect_packet.keep_alive / 2
+    check_interval = (c.opts.keep_alive > 10) ? 5 : c.opts.keep_alive / 2
     t = Timer(0, check_interval)
     waiter = Task(function()
-    println("keep alive loop started")
+    println("keep alive started")
     while isopen(t)
         keep_alive(c)
         try
@@ -162,18 +160,18 @@ function keep_alive_timer(c::Client)
             isa(e, EOFError) || rethrow(exc)
         end
     end
-    println("keep alive loop stopped")
+    println("keep alive stopped")
 end)
 yield(waiter)
 return t
 end
 
 function keep_alive(c::Client)
-    keep_alive = c.connect_packet.keep_alive
+    keep_alive = c.opts.keep_alive
     now = time()
     if c.ping_outstanding[] == 0x00
         if now - c.last_sent[] >= keep_alive || now - c.last_received[] >= keep_alive
-            get(send_packet(c, Pingreq()))
+            send_packet(c, Pingreq())
             atomic_add!(c.ping_outstanding, 0x0001)
         end
     else
@@ -197,57 +195,73 @@ end
 
 function handle(c::Client, packet::Publish)
     if packet.message.qos == AT_LEAST_ONCE
-        send_packet(c, Puback(packet.id))
+        send_packet(c, Puback(packet.id), true)
     elseif packet.message.qos == EXACTLY_ONCE
-        send_packet(c, Pubrec(packet.id))
+        send_packet(c, Pubrec(packet.id), true)
     end
     @schedule c.on_msg(packet.message.topic, packet.message.payload)
 end
 
 function handle(c::Client, packet::Pubrec)
-    send_packet(c, Pubrel(packet.id))
+    send_packet(c, Pubrel(packet.id), true)
 end
 
 function handle(c::Client, packet::Pubrel)
-    send_packet(c, Pubcomp(packet.id))
+    send_packet(c, Pubcomp(packet.id), true)
 end
 
 function handle(c::Client, packet::Pingresp)
     atomic_sub!(c.ping_outstanding, 0x0001)
 end
 
-function connect_async(c::Client, host::AbstractString, port::Integer=1883;
-    io::IO=connect(host, port),
-    clean_session::Bool=true,
-    keep_alive::UInt16=0x0000,
-    client_id::String="",
-    will::Nullable{Message}=Nullable{Message}(),
-    username::Nullable{String}=Nullable{String}(),
-    password::Nullable{Array{UInt8}}=Nullable{Array{UInt8}}())
-    c.io = io
-    c.connect_packet = Connect(clean_session, keep_alive, client_id, will, username, password)
-    connect(c)
+"""
+    connect(client, opts, [async=false])
+
+Connects to a broker using the specified options.
+
+If `async` is `true` a `Future` is returned. Otherwise the function blocks till the operation is completed.
+
+See also [`get`](@ref).
+"""
+function connect(client::Client, opts::ConnectOpts; async::Bool=false)
+    client.opts = opts
+
+    client.in_flight = Dict{UInt16, Future}()
+    client.queue = Channel{Tuple{Packet, Future}}(client.queue.sz_max)
+    atomic_xchg!(client.disconnecting, 0x00)
+
+    @schedule out_loop(client)
+    @schedule in_loop(client)
+    if client.opts.keep_alive > 0x0000
+        client.keep_alive_timer = keep_alive_timer(client)
+    end
+
+    send_packet(client, Connect(opts.clean_session, opts.keep_alive, opts.client_id, opts.will, opts.username, opts.password), async)
 end
 
-function connect(c::Client, host::AbstractString, port::Integer=1883;
-    io::IO=connect(host, port),
-    clean_session::Bool=true,
-    keep_alive::UInt16=0x0000,
-    client_id::String="",
-    will::Nullable{Message}=Nullable{Message}(),
-    username::Nullable{String}=Nullable{String}(),
-    password::Nullable{Array{UInt8}}=Nullable{Array{UInt8}}())
-    get(connect_async(c, host, port, io=io, clean_session=clean_session,
-    keep_alive=keep_alive, client_id=client_id, will=will, username=username, password=password))
+function disconnect(client::Client, reason::Union{Exception,Void}=nothing)
+    # ignore errors while disconnecting
+    if client.disconnecting[] == 0x00
+        atomic_xchg!(client.disconnecting, 0x01)
+        close(client.keep_alive_timer)
+        if !(typeof(reason) <: Exception)
+            send_packet(client, Disconnect())
+        end
+        close(client.queue)
+        close(client.opts.io)
+        client.on_disconnect(reason)
+    end
 end
 
-subscribe_async(c::Client, topics::Topic...) = send_packet(c, Subscribe(collect(topics)))
-subscribe(c::Client, topics::Topic...) = get(subscribe_async(c, topics...))
+function subscribe(client::Client, topics::Topic...; async::Bool=false)
+    future = send_packet(client, Subscribe(collect(topics)), async)
+end
 
-unsubscribe_async(c::Client, topics::String...) = send_packet(c, Unsubscribe(collect(topics)))
-unsubscribe(c::Client, topics::String...) = get(unsubscribe_async(c, topics...))
+function unsubscribe(client::Client, topics::String...; async::Bool=false)
+    future = send_packet(client, Unsubscribe(collect(topics)), async)
+end
 
-publish_async(c::Client, topic::String, payload::Array{UInt8};
-qos::QOS=AT_MOST_ONCE, retain::Bool=false) = send_packet(c, Publish(Message(false, qos, retain, topic, payload)))
-publish(c::Client, topic::String, payload::Array{UInt8};
-qos::QOS=AT_MOST_ONCE, retain::Bool=false) = get(publish_async(c, topic, payload, qos=qos, retain=retain))
+function publish(client::Client, topic::String, payload::Array{UInt8};
+    async::Bool=false, qos::QOS=AT_MOST_ONCE, retain::Bool=false)
+    send_packet(client, Publish(Message(false, qos, retain, topic, payload)), async)
+end

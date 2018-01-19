@@ -41,8 +41,5 @@ struct Message
     topic::String
     payload::Array{UInt8}
 end
-
 Base.show(io::IO, x::Message) = print(io, "[dup: ", x.dup,
-", qos: ", x.qos,
-", retain: ", x.retain,
-", topic: ", x.topic, "]")
+    ", qos: ", x.qos, ", retain: ", x.retain, ", topic: ", x.topic, "]")
