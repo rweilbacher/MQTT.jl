@@ -1,5 +1,3 @@
-import Base.connect
-
 # commands
 const CONNECT = 0x10
 const CONNACK = 0x20
@@ -16,6 +14,11 @@ const PINGREQ = 0xC0
 const PINGRESP = 0xD0
 const DISCONNECT = 0xE0
 
+@enum(QOS::UInt8,
+    QOS_0 = 0x00,
+    QOS_1 = 0x01,
+    QOS_2 = 0x02)
+
 # connect return code
 const CONNECTION_ACCEPTED = 0x00
 const CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION = 0x01
@@ -26,9 +29,6 @@ const CONNECTION_REFUSED_NOT_AUTHORIZED = 0x05
 
 struct MQTTException <: Exception
     msg::AbstractString
-end
-
-struct MQTT_ERR_INVAL <: Exception
 end
 
 struct Packet
@@ -42,6 +42,14 @@ struct Message
     retain::Bool
     topic::String
     payload::Array{UInt8}
+
+    function Message(qos::QOS, topic::String, payload...)
+        return Message(false, convert(UInt8, qos), false, topic, payload...)
+    end
+
+    function Message(dup::Bool, qos::QOS, retain::Bool, topic::String, payload...)
+        return Message(dup, convert(UInt8, qos), retain, topic, payload...)
+    end
 
     function Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)
         # Convert payload to UInt8 Array with PipeBuffer
@@ -69,26 +77,51 @@ mutable struct Client
 
     write_packets::Channel{Packet}
     socket
+    socket_lock # TODO add type
 
-    received_pingresp::Bool
+    ping_timeout::UInt64
 
-    Client(on_msg) = new(
+    # TODO remove atomic?
+    ping_outstanding::Atomic{UInt8}
+    last_sent::Atomic{Float64}
+    last_received::Atomic{Float64}
+
+    Client(on_msg::Function) = new(
     on_msg,
     0x0000,
     0x0000,
     Dict{UInt16, Future}(),
     Channel{Packet}(60),
     TCPSocket(),
-    false)
+    ReentrantLock(),
+    60,
+    Atomic{UInt8}(0),
+    Atomic{Float64}(),
+    Atomic{Float64}())
+
+    Client(on_msg::Function, ping_timeout::UInt64) = new(
+    on_msg,
+    0x0000,
+    0x0000,
+    Dict{UInt16, Future}(),
+    Channel{Packet}(60),
+    TCPSocket(),
+    ReentrantLock(),
+    ping_timeout,
+    Atomic{UInt8}(0),
+    Atomic{Float64}(),
+    Atomic{Float64}())
 end
 
-const CONNACK_STRINGS = [
-"connection refused unacceptable protocol version",
-"connection refused identifier rejected",
-"connection refused server unavailable",
-"connection refused bad user name or password",
-"connection refused not authorized",
-]
+
+
+const CONNACK_ERRORS = Dict{UInt8, String}(
+0x01 => "connection refused unacceptable protocol version",
+0x02 => "connection refused identifier rejected",
+0x03 => "connection refused server unavailable",
+0x04 => "connection refused bad user name or password",
+0x05 => "connection refused not authorized",
+)
 
 function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     session_present = read(s, UInt8)
@@ -98,16 +131,8 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     if return_code == CONNECTION_ACCEPTED
         put!(future, session_present)
     else
-        try
-            put!(future, MQTTException(CONNACK_STRINGS[return_code]))
-        catch e
-            if isa(e, BoundsError)
-                put!(future, MQTTException("unkown return code [" + return_code + "]"))
-                # TODO close connection
-            else
-                rethrow()
-            end
-        end
+        error = CONNACK_ERRORS[return_code]
+        put!(future, MQTTException(error))
     end
 end
 
@@ -132,10 +157,16 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     @schedule client.on_msg(topic, payload)
 end
 
-#TODO what kind of ack?
 function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
-    put!(client.in_flight[id], nothing)
+    # TODO move this to its own function
+    if haskey(client.in_flight, id)
+        future = client.in_flight[id]
+        put!(future, nothing)
+        delete!(client.in_flight, id)
+    else
+        # TODO unexpected ack protocol error
+    end
 end
 
 function handle_pubrec(client::Client, s::IO, cmd::UInt8, flags::UInt8)
@@ -155,15 +186,15 @@ function handle_suback(client::Client, s::IO, cmd::UInt8, flags::UInt8)
 end
 
 function handle_pingresp(client::Client, s::IO, cmd::UInt8, flags::UInt8)
-    if client.received_pingresp == false
-      client.received_pingresp = true
+    if client.ping_outstanding[] == 0x1
+      atomic_xchg!(client.ping_outstanding, 0x0)
     else
       # We received a subresp packet we didn't ask for
       disconnect(client)
     end
 end
 
-const handlers = Dict{UInt8, Function}(
+const HANDLERS = Dict{UInt8, Function}(
 CONNACK => handle_connack,
 PUBLISH => handle_publish,
 PUBACK => handle_ack,
@@ -193,9 +224,12 @@ function write_loop(client)
                 mqtt_write(buffer, i)
             end
             data = take!(buffer)
+            lock(client.socket_lock)
             write(client.socket, packet.cmd)
             write_len(client.socket, length(data))
             write(client.socket, data)
+            unlock(client.socket_lock)
+            atomic_xchg!(client.last_sent, time())
         end
     catch e
         # channel closed
@@ -216,9 +250,13 @@ function read_loop(client)
             buffer = PipeBuffer(data)
             cmd = cmd_flags & 0xF0
             flags = cmd_flags & 0x0F
-            # TODO check contains
-            # TODO handle errors
-            handlers[cmd](client, buffer, cmd, flags)
+
+            if haskey(HANDLERS, cmd)
+                atomic_xchg!(client.last_received, time())
+                HANDLERS[cmd](client, buffer, cmd, flags)
+            else
+                # TODO unexpected cmd protocol error
+            end
         end
     catch e
         # socket closed
@@ -229,26 +267,53 @@ function read_loop(client)
 end
 
 function keep_alive_loop(client::Client)
+    ping_sent = time()
+
+    if client.keep_alive > 10
+      check_interval = 5
+    else
+      check_interval = client.keep_alive / 2
+    end
+    timer = Timer(0, check_interval)
+
     while true
-      try
-        write_packet(client, PINGREQ) # TODO test if this leads to time issues and put a socket mutex and write here directly if it does
-      catch e
-        if isa(e, InvalidStateException)
-          # A disconnect has happened -> Stop the loop
-          break;
-        else
-          rethrow()
+      if time() - client.last_sent[] >= client.keep_alive || time() - client.last_received[] >= client.keep_alive
+        if client.ping_outstanding[] == 0x0
+          atomic_xchg!(client.ping_outstanding, 0x1)
+          try
+            lock(client.socket_lock)
+            write(client.socket, PINGREQ)
+            write(client.socket, 0x00)
+            unlock(client.socket_lock)
+            atomic_xchg!(client.last_sent, time())
+          catch e
+              if isa(e, InvalidStateException)
+                  break
+                  # TODO is this the socket closed exception? Handle accordingly
+              else
+                  rethrow()
+              end
+          end
+          ping_sent = time()
         end
       end
-      sleep(client.keep_alive)
 
-      if client.received_pingresp == false
-        # No pingresp received
-        disconnect(client)
-        #TODO automatic reconnect
-      else
-        client.received_pingresp = false
+      if client.ping_outstanding[] == 1 && time() - ping_sent >= client.ping_timeout
+        try # No pingresp received
+          disconnect(client)
+          break
+        catch e
+            # channel closed
+            if isa(e, InvalidStateException)
+                break
+            else
+                rethrow()
+            end
+        end
+        # TODO automatic reconnect
       end
+
+      wait(timer)
     end
 end
 
@@ -266,7 +331,24 @@ function get(future)
     return r
 end
 
-#TODO change keep_alive to Int64 and convert ourselves
+"""
+    connect_async(client::Client, host::AbstractString, port::Integer=1883;
+       keep_alive::UInt16=0x0000,
+       client_id::String=randstring(8),
+       user::User=User("", ""),
+       will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
+       clean_session::Bool=true)
+
+Connects the `Client` instance to the specified broker. 
+Returns a `Future` object that contains a session_present bit from the broker on success and an exception on failure.
+
+# Arguments
+- `keep_alive::Int64=0`: Time in seconds to wait before sending a ping to the broker if no other packets are being sent or received.
+- `client_id::String=randstring(8)`: The id of the client.
+- `user::User=User("", "")`: The MQTT authentication.
+- `will::Message=Message(false, 0x00, false, "", Array{UInt8}())`: The MQTT will to send to all other clients when this client disconnects.  
+- `clean_session::Bool=true`: Flag to resume a session with the broker if present.
+"""
 function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     keep_alive::Int64=0,
     client_id::String=randstring(8),
@@ -325,6 +407,24 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     return future
 end
 
+"""
+    connect(client::Client, host::AbstractString, port::Integer=1883;
+        keep_alive::UInt16=0x0000,
+        client_id::String=randstring(8),
+        user::User=User("", ""),
+        will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
+        clean_session::Bool=true)
+
+Connects the `Client` instance to the specified broker. 
+Waits until the connect is done. Returns the session_present bit from the broker on success and an exception on failure.
+
+# Arguments
+- `keep_alive::Int64=0`: Time in seconds to wait before sending a ping to the broker if no other packets are being sent or received.
+- `client_id::String=randstring(8)`: The id of the client.
+- `user::User=User("", "")`: The MQTT authentication.
+- `will::Message=Message(false, 0x00, false, "", Array{UInt8}())`: The MQTT will to send to all other clients when this client disconnects.  
+- `clean_session::Bool=true`: Flag to resume a session with the broker if present.
+"""
 connect(client::Client, host::AbstractString, port::Integer=1883;
 keep_alive::Int64=0,
 client_id::String=randstring(8),
@@ -332,42 +432,77 @@ user::User=User("", ""),
 will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
 clean_session::Bool=true) = get(connect_async(client, host, port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
 
-function disconnect(client)
+"""
+    disconnect(client::Client)
+
+Disconnects the client from the broker and stops the tasks.
+"""
+function disconnect(client::Client)
     write_packet(client, DISCONNECT)
     close(client.write_packets)
     wait(client.socket.closenotify)
 end
 
-function subscribe_async(client, topics...)
+"""
+    subscribe_async(client::Client, topics::Tuple{String, QOS}...)
+
+Subscribes the `Client` instance to the supplied topic tuples.
+Returns a `Future` object that contains the actually received QOS levels for each topic on success. Contains an exception on failure
+"""
+function subscribe_async(client::Client, topics::Tuple{String, QOS}...)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
-    write_packet(client, SUBSCRIBE | 0x02, id, topics...)
+    topic_data = []
+    for t in topics
+        for data in t
+            push!(topic_data, data)
+        end
+    end
+    write_packet(client, SUBSCRIBE | 0x02, id, topic_data...)
     return future
 end
 
-# TODO change topics to Tuple{String, UInt8}
-function subscribe(client, topics...)
-    future = subscribe_async(client, topics...)
-    return get(future)
-end
+"""
+    subscribe(client::Client, topics::Tuple{String, QOS}...)
 
-function unsubscribe_async(client, topics...)
+Waits until the subscribe is fully acknowledged. Returns the actually received QOS levels for each topic on success. 
+Contains an exception on failure.
+"""
+subscribe(client::Client, topics::Tuple{String, QOS}...) = get(subscribe_async(client, topics...))
+
+"""
+    unsubscribe_async(client::Client, topics::String...)
+
+Unsubscribes the `Client` instance from the supplied topic names.
+Returns a `Future` object that contains `nothing` on success and an exception on failure. 
+"""
+function unsubscribe_async(client::Client, topics::String...)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
+    topic_data = []
     write_packet(client, UNSUBSCRIBE | 0x02, id, topics...)
     return future
 end
 
-function unsubscribe(client, topics...)
-    future = unsubscribe_async(client, topics...)
-    return get(future)
-end
+"""
+    unsubscribe(client::Client, topics::String...) 
 
+Unsubscribes the `Client` instance from the supplied topic names.
+Waits until the unsubscribe is fully acknowledged. Returns `nothing` on success and an exception on failure.
+"""
+unsubscribe(client::Client, topics::String...) = get(unsubscribe_async(client, topics...))
+
+"""
+   publish_async(client::Client, message::Message)
+
+Publishes the message. Returns a `Future` object that contains `nothing` on success and an exception on failure. 
+"""
 function publish_async(client::Client, message::Message)
     future = Future()
     optional = ()
+    topic_wildcard_len_check(message.topic)
     if message.qos == 0x00
         put!(future, 0)
     elseif message.qos == 0x01 || message.qos == 0x02
@@ -383,32 +518,37 @@ function publish_async(client::Client, message::Message)
     return future
 end
 
-function publish_async(client::Client, topic::String, payload...;
+"""
+    publish_async(client::Client, topic::String, payload...;
+       dup::Bool=false,
+       qos::QOS=QOS_0,
+       retain::Bool=false)
+
+Pulishes a message with the specified parameters. Returns a `Future` object that contains `nothing` on success and an exception on failure.  
+"""
+publish_async(client::Client, topic::String, payload...;
     dup::Bool=false,
-    qos::UInt8=0x00,
-    retain::Bool=false)
+    qos::QOS=QOS_0,
+    retain::Bool=false) = publish_async(client, Message(dup, convert(UInt8, qos), retain, topic, payload...))
 
-    return publish_async(client, Message(dup, qos, retain, topic, payload...))
-end
+"""
+   publish(client::Client, topic::String, payload...;
+      dup::Bool=false,
+      qos::QOS=QOS_0,
+      retain::Bool=false)
 
-function publish(client::Client, topic::String, payload...;
+ Waits until the publish is completely acknowledged. Publishes a message with the specified parameters. Returns `nothign` on success and throws an exception on failure.
+"""
+publish(client::Client, topic::String, payload...;
     dup::Bool=false,
-    qos::UInt8=0x00,
-    retain::Bool=false)
-    try
-      topic_wildcard_len_check(topic)
-    catch
-      error("Topic is invalid.")
-    end
-    get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
-
-end
+    qos::QOS=QOS_0,
+    retain::Bool=false) = get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
 
 # Helper method to check if it is possible to subscribe to a topic
 function filter_wildcard_len_check(sub)
     #Regex: matches any valid topic, + and # are not in allowed in strings, + is only allowed as a single symbol between two /, # is only allowed at the end
     if !(ismatch(r"(^[^#+]+|[+])(/([^#+]+|[+]))*(/#)?$", sub)) || length(sub) > 65535
-        throw(MQTT_ERR_INVAL())
+        throw(MQTTException("Invalid topic"))
     end
 end
 
@@ -418,6 +558,6 @@ function topic_wildcard_len_check(topic)
      # Also returns MQTT_ERR_INVAL if the topic string is too long.
      # Returns MQTT_ERR_SUCCESS if everything is fine.
     if !(ismatch(r"^[^#+]+$", topic)) || length(topic) > 65535
-        throw(MQTT_ERR_INVAL())
+        throw(MQTTException("Invalid topic"))
     end
 end

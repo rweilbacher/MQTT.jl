@@ -1,7 +1,4 @@
-using MQTT
-using Base.Test
-import MQTT: Message
-import MQTT: User
+import MQTT.User
 
 info("Running smoke tests")
 
@@ -24,27 +21,22 @@ connect(client, "test.mosquitto.org")
 disconnect(client)
 connect(client, "test.mosquitto.org")
 
-subscribe(client, topic, 0x00)
+subscribe(client, (topic, QOS_0))
 
 info("Testing publish qos 0")
-publish(client, topic, payload, qos=0x00)
+publish(client, topic, payload, qos=QOS_0)
 wait(condition)
 
 info("Testing publish qos 1")
-publish(client, topic, payload, qos=0x01)
+publish(client, topic, payload, qos=QOS_1)
 wait(condition)
 
 info("Testing publish qos 2")
-publish(client, topic, payload, qos=0x02)
+publish(client, topic, payload, qos=QOS_2)
 wait(condition)
 
 info("Testing connect will")
 disconnect(client)
 connect(client, "test.mosquitto.org", will=Message(false, 0x00, false, topic, payload))
-
-info("Testing connect with user name an pasword")
-disconnect(client)
-connect(client, "test.mosquitto.org", user=User("user", "1234"))
-
 
 disconnect(client)
