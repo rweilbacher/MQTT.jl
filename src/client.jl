@@ -15,11 +15,11 @@ mutable struct ConnectOpts
     will::Nullable{Message}
     username::Nullable{String}
     password::Nullable{Array{UInt8}}
-    io::IO
+    get_io::Function
 end
-ConnectOpts(io::IO) = ConnectOpts(true, 0x0000, "", Nullable{Message}(), Nullable{String}(), Nullable{Array{UInt8}}(), io)
-ConnectOpts(host::AbstractString, port::Integer=1883) = ConnectOpts(connect(host, port))
-ConnectOpts() = ConnectOpts(TCPSocket())
+ConnectOpts(get_io::Function) = ConnectOpts(true, 0x0000, "", Nullable{Message}(), Nullable{String}(), Nullable{Array{UInt8}}(), get_io)
+ConnectOpts(host::AbstractString, port::Integer=1883) = ConnectOpts(() -> connect(host, port))
+ConnectOpts() = ConnectOpts(() -> TCPSocket())
 
 const CONNACK_ERRORS = [
 "connection refused unacceptable protocol version",
@@ -41,6 +41,7 @@ mutable struct Client
     last_received::Atomic{Float64}
     ping_outstanding::Atomic{UInt16}
     keep_alive_timer::Timer
+    io::IO
 
     Client(on_msg::Function, on_disconnect::Function, ping_timeout::Int64) = new(
     on_msg,
@@ -54,7 +55,8 @@ mutable struct Client
     Atomic{Float64}(),
     Atomic{Float64}(),
     Atomic{UInt16}(),
-    Timer(0, 0))
+    Timer(0, 0),
+    TCPSocket())
 end
 
 function packet_id(c::Client)
@@ -88,7 +90,7 @@ function get(future::Future)
     return r
 end
 
-function send_packet(c::Client, packet::Packet, async=false)
+function send_packet(c::Client, packet::Packet, async::Bool=false)
     future = Future()
     put!(c.queue, (packet, future))
     if async
@@ -102,7 +104,7 @@ function in_loop(c::Client)
     println("in started")
     try
         while true
-            packet = read_packet(c.opts.io)
+            packet = read_packet(c.io)
             atomic_xchg!(c.last_received, time())
             println("in ", packet)
             handle(c, packet)
@@ -131,7 +133,7 @@ function out_loop(c::Client)
                 c.in_flight[packet.id] = future
             end
             atomic_xchg!(c.last_sent, time())
-            write_packet(c.opts.io, packet)
+            write_packet(c.io, packet)
             println("out ", packet)
             # complete the futures of packets that don't need acknowledgment
             if !has_id(packet)
@@ -174,6 +176,8 @@ function keep_alive(c::Client)
             send_packet(c, Pingreq())
             atomic_add!(c.ping_outstanding, 0x0001)
         end
+    elseif c.ping_outstanding[] < 0x00
+        disconnect(c, MQTTException("protocol error"))
     else
         if now - c.last_received[] >= c.ping_timeout
             disconnect(c, MQTTException("ping timed out"))
@@ -225,6 +229,7 @@ See also [`get`](@ref).
 """
 function connect(client::Client, opts::ConnectOpts; async::Bool=false)
     client.opts = opts
+    client.io = opts.get_io()
 
     client.in_flight = Dict{UInt16, Future}()
     client.queue = Channel{Tuple{Packet, Future}}(client.queue.sz_max)
@@ -248,20 +253,25 @@ function disconnect(client::Client, reason::Union{Exception,Void}=nothing)
             send_packet(client, Disconnect())
         end
         close(client.queue)
-        close(client.opts.io)
+        close(client.io)
         client.on_disconnect(reason)
     end
 end
 
 function subscribe(client::Client, topics::Topic...; async::Bool=false)
-    future = send_packet(client, Subscribe(collect(topics)), async)
+    send_packet(client, Subscribe(collect(topics)), async)
 end
 
 function unsubscribe(client::Client, topics::String...; async::Bool=false)
-    future = send_packet(client, Unsubscribe(collect(topics)), async)
+    send_packet(client, Unsubscribe(collect(topics)), async)
 end
 
 function publish(client::Client, topic::String, payload::Array{UInt8};
     async::Bool=false, qos::QOS=AT_MOST_ONCE, retain::Bool=false)
     send_packet(client, Publish(Message(false, qos, retain, topic, payload)), async)
 end
+
+publish(client::Client, topic::String, payload::String;
+    async::Bool=false,
+    qos::QOS=AT_MOST_ONCE,
+    retain::Bool=false) = publish(client, topic, convert(Array{UInt8}, payload), async=async, qos=qos, retain=retain)

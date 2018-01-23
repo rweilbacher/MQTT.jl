@@ -13,7 +13,11 @@ include("packets/ping.jl")
 include("net.jl")
 include("client.jl")
 
-export Client,
+export
+AT_MOST_ONCE,
+AT_LEAST_ONCE,
+EXACTLY_ONCE,
+Client,
 ConnectOpts,
 get,
 connect,
