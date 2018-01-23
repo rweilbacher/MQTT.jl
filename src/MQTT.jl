@@ -8,6 +8,7 @@ include("client.jl")
 
 export
     Client,
+    User,
     QOS_0,
     QOS_1,
     QOS_2,
@@ -20,6 +21,6 @@ export
     publish_async,
     publish,
     disconnect,
-    get
-
+    get,
+    MQTT_ERR_INVAL
 end

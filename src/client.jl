@@ -131,7 +131,7 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     if return_code == CONNECTION_ACCEPTED
         put!(future, session_present)
     else
-        error = get(CONNACK_ERRORS, return_code, "unkown return code [" + return_code + "]")
+        error = CONNACK_ERRORS[return_code]
         put!(future, MQTTException(error))
     end
 end
@@ -350,14 +350,18 @@ Returns a `Future` object that contains a session_present bit from the broker on
 - `clean_session::Bool=true`: Flag to resume a session with the broker if present.
 """
 function connect_async(client::Client, host::AbstractString, port::Integer=1883;
-    keep_alive::UInt16=0x0000,
+    keep_alive::Int64=0,
     client_id::String=randstring(8),
     user::User=User("", ""),
     will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
     clean_session::Bool=true)
 
     client.write_packets = Channel{Packet}(client.write_packets.sz_max)
-    client.keep_alive = keep_alive
+    try
+        client.keep_alive = convert(UInt16, keep_alive)
+    catch
+        error("Could not convert keep_alive to UInt16")
+    end
     client.socket = connect(host, port)
     @schedule write_loop(client)
     @schedule read_loop(client)
@@ -372,10 +376,20 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     protocol_level = 0x04
     connect_flags = 0x02 # clean session
 
-    optional = ()
+    optional_user = ()
+    optional_will = ()
+
+    if length(user.name) > 0 && length(user.password) > 0
+        connect_flags |= 0xC0
+        optional_user = (user.name, user.password)
+    elseif length(user.name) > 0
+        connect_flags |= 0x80
+        optional_user = (user.name)
+    end
 
     if length(will.topic) > 0
-        # TODO
+        optional_will = (will.topic, convert(UInt16, length(will.payload)), will.payload)
+        connect_flags |= 0x04 | ((will.qos & 0x03) << 3) | ((will.retain & 0x01) << 5)
     end
 
     future = Future()
@@ -387,7 +401,8 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     connect_flags,
     client.keep_alive,
     client_id,
-    optional...)
+    optional_user...,
+    optional_will...)
 
     return future
 end
@@ -411,7 +426,7 @@ Waits until the connect is done. Returns the session_present bit from the broker
 - `clean_session::Bool=true`: Flag to resume a session with the broker if present.
 """
 connect(client::Client, host::AbstractString, port::Integer=1883;
-keep_alive::UInt16=0x0000,
+keep_alive::Int64=0,
 client_id::String=randstring(8),
 user::User=User("", ""),
 will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
@@ -487,6 +502,7 @@ Publishes the message. Returns a `Future` object that contains `nothing` on succ
 function publish_async(client::Client, message::Message)
     future = Future()
     optional = ()
+    topic_wildcard_len_check(message.topic)
     if message.qos == 0x00
         put!(future, 0)
     elseif message.qos == 0x01 || message.qos == 0x02
@@ -527,3 +543,21 @@ publish(client::Client, topic::String, payload...;
     dup::Bool=false,
     qos::QOS=QOS_0,
     retain::Bool=false) = get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
+
+# Helper method to check if it is possible to subscribe to a topic
+function filter_wildcard_len_check(sub)
+    #Regex: matches any valid topic, + and # are not in allowed in strings, + is only allowed as a single symbol between two /, # is only allowed at the end
+    if !(ismatch(r"(^[^#+]+|[+])(/([^#+]+|[+]))*(/#)?$", sub)) || length(sub) > 65535
+        throw(MQTTException("Invalid topic"))
+    end
+end
+
+# Helper method to check if it is possible to publish a topic
+function topic_wildcard_len_check(topic)
+    # Search for + or # in a topic. Return MQTT_ERR_INVAL if found.
+     # Also returns MQTT_ERR_INVAL if the topic string is too long.
+     # Returns MQTT_ERR_SUCCESS if everything is fine.
+    if !(ismatch(r"^[^#+]+$", topic)) || length(topic) > 65535
+        throw(MQTTException("Invalid topic"))
+    end
+end

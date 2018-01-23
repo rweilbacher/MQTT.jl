@@ -14,10 +14,17 @@ Sprint 1:
 		think about what we need to do and how
 		the reconnect should still work
 	put handle methods to other file (Alexander, Pia)
+<<<<<<< HEAD:ToDo.txt
+		ez pz - done
+	topic check into publish (Alexander, Pia) - done
+	include unit tests into runtests.jl (Alexander, Pia) - done
+		
+=======
 		ez pz
 	topic check into publish (Alexander, Pia)
 	include unit tests into runtests.jl (Alexander, Pia)
 
+>>>>>>> master:TODO.txt
 	Tests: (Nathan, Pia)
 		qos2 flow and package structure
 		connect variations

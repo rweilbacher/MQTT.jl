@@ -1,7 +1,9 @@
+import MQTT.User
+
 info("Running smoke tests")
 
 condition = Condition()
-topic = randstring(20)
+topic = "foo"
 payload = randstring(20)
 
 function on_msg(t, p)
@@ -32,5 +34,9 @@ wait(condition)
 info("Testing publish qos 2")
 publish(client, topic, payload, qos=QOS_2)
 wait(condition)
+
+info("Testing connect will")
+disconnect(client)
+connect(client, "test.mosquitto.org", will=Message(false, 0x00, false, topic, payload))
 
 disconnect(client)
