@@ -24,6 +24,12 @@ mutable struct TestFileHandler <: IO
     closed::Bool
 end
 
+function TestFileHandler()
+    th = TestFileHandler(Channel{UInt8}(256), Channel{UInt8}(256), Condition(), Condition(), false)
+    put_from_file(th, "data/input/connack.dat")
+    return th
+end
+
 function read(fh::TestFileHandler, t)
     return take!(fh.in_channel)
 end
@@ -117,10 +123,4 @@ function read_all_to_arr(filename)
     end
     close(file)
     return data
-end
-
-function connect(host::AbstractString, port::Integer)
-    th = TestFileHandler(Channel{UInt8}(256), Channel{UInt8}(256), Condition(), Condition(), false)
-    put_from_file(th, "data/input/connack.dat")
-    return th
 end

@@ -1,26 +1,29 @@
 module MQTT
 
-import Base: connect, ReentrantLock, lock, unlock
-using Base.Threads, Base.Dates
+import Base: connect, read, write, get
 
 include("utils.jl")
+include("packet.jl")
+include("packets/connect.jl")
+include("packets/publish.jl")
+include("packets/subscribe.jl")
+include("packets/unsubscribe.jl")
+include("packets/disconnect.jl")
+include("packets/ping.jl")
+include("net.jl")
 include("client.jl")
 
 export
-    Client,
-    User,
-    QOS_0,
-    QOS_1,
-    QOS_2,
-    connect_async,
-    connect,
-    subscribe_async,
-    subscribe,
-    unsubscribe_async,
-    unsubscribe,
-    publish_async,
-    publish,
-    disconnect,
-    get,
-    MQTT_ERR_INVAL
+AT_MOST_ONCE,
+AT_LEAST_ONCE,
+EXACTLY_ONCE,
+Client,
+ConnectOpts,
+get,
+connect,
+disconnect,
+subscribe,
+unsubscribe,
+publish
+
 end
