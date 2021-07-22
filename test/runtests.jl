@@ -8,7 +8,7 @@ import Sockets: connect
 
 const datadir = joinpath(dirname(@__FILE__), "data")
 
-include("smoke.jl")
+# include("smoke.jl")
 include("mocksocket.jl")
 include("packet.jl")
 include("unittests.jl")

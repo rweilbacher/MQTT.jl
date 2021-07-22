@@ -1,9 +1,21 @@
 @info "Running packet tests"
 
 function on_msg(topic, payload)
-    @info "Received message topic: [", topic, "] payload: [", String(copy(payload)), "]"
+    @info "Received message" topic=topic "payload"=String(copy(payload))
     @test topic == "abc"
     @test String(copy(payload)) == "qwerty"
+end
+
+function on_disconnect(reason)
+    @test reason == nothing
+end
+
+function on_disconnect_ping(reason)
+    @test reason.msg == "ping timed out"
+end
+
+function on_disconnect_pingresp(reason)
+    @test reason.msg == "protocol error"
 end
 
 function is_out_correct(filename_expected::AbstractString, actual::Channel{UInt8}, mid::UInt16)
@@ -47,28 +59,30 @@ function is_out_correct(filename_expected::AbstractString, actual::Channel{UInt8
     return correct
 end
 
+next_id(c) = c.last_id + 0x0001
+
 function test()
-    client = Client(on_msg)
+    client = Client(on_msg, on_disconnect, 60)
+    opts = ConnectOpts(() -> TestFileHandler())
+    opts.client_id = "TestID"
+
     last_id::UInt16 = 0x0001
 
-    inputdir = joinpath(datadir, "input")
-    outputdir = joinpath(datadir, "output")
-
     @info "Testing connect"
-    connect(client, "test.mosquitto.org", client_id="TestID")
-    tfh::TestFileHandler = client.socket
-    @test is_out_correct(joinpath(outputdir, "connect.dat"), tfh.out_channel)
+    connect(client, opts)
+    tfh::TestFileHandler = client.io
+    @test is_out_correct("data/output/connect.dat", tfh.out_channel)
     # CONNACK is automatically being sent in connect call
 
     @info "Testing subscribe"
-    subscribe_async(client, ("abc", QOS_1), ("cba", QOS_0))
-    put_from_file(tfh, joinpath(inputdir, "suback.dat"), client.last_id)
-    @test is_out_correct(joinpath(outputdir, "subreq.dat"), tfh.out_channel, client.last_id)
+    subscribe(client, ("abc", AT_LEAST_ONCE), ("cba", AT_MOST_ONCE), async=true)
+    @test is_out_correct("data/output/subreq.dat", tfh.out_channel, next_id(client))
+    put_from_file(tfh, "data/input/suback.dat", client.last_id)
 
     @info "Testing unsubscribe"
-    unsubscribe_async(client, "abc", "cba")
-    put_from_file(tfh, joinpath(inputdir, "unsuback.dat"), client.last_id)
-    @test is_out_correct(joinpath(outputdir, "unsubreq.dat"), tfh.out_channel, client.last_id)
+    unsubscribe(client, "abc", "cba", async=true)
+    @test is_out_correct("data/output/unsubreq.dat", tfh.out_channel, next_id(client))
+    put_from_file(tfh, "data/input/unsuback.dat", client.last_id)
 
     @info "Testing receive publish QOS 0"
     put_from_file(tfh, joinpath(inputdir, "qos0pub.dat"))
@@ -86,49 +100,56 @@ function test()
     #last_id += 1
 
     @info "Testing send publish QOS 0"
-    publish_async(client, "test1", "QOS_0", qos=QOS_0)
-    @test is_out_correct(joinpath(outputdir, "qos0pub.dat"), tfh.out_channel)
+    publish(client, "test1", "QOS_0", qos=AT_MOST_ONCE, async=true)
+    @test is_out_correct("data/output/qos0pub.dat", tfh.out_channel)
 
     @info "Testing send publish QOS 1"
-    publish_async(client, "test2", "QOS_1", qos=QOS_1)
-    put_from_file(tfh, joinpath(inputdir, "puback.dat"), client.last_id)
-    @test is_out_correct(joinpath(outputdir, "qos1pub.dat"), tfh.out_channel, client.last_id)
-
+    publish(client, "test2", "QOS_1", qos=AT_LEAST_ONCE, async=true)
+    @test is_out_correct("data/output/qos1pub.dat", tfh.out_channel, next_id(client))
+    put_from_file(tfh, "data/input/puback.dat", client.last_id)
 
     @info "Testing send publish QOS 2"
-    publish_async(client, "test3", "test", qos=QOS_2)
-    @test is_out_correct(joinpath(outputdir, "qos2pub.dat"), tfh.out_channel, client.last_id)
-    put_from_file(tfh, joinpath(inputdir, "pubrec.dat"), client.last_id)
-    @test is_out_correct(joinpath(outputdir, "pubrel.dat"), tfh.out_channel, client.last_id)
-    put_from_file(tfh, joinpath(inputdir, "pubcomp.dat"), client.last_id)
+    f = publish(client, "test3", "test", qos=EXACTLY_ONCE, async=true)
+    id = next_id(client)
+    @test is_out_correct("data/output/qos2pub.dat", tfh.out_channel, id)
+    put_from_file(tfh, "data/input/pubrec.dat", id)
+    @test is_out_correct("data/output/pubrel.dat", tfh.out_channel, id)
+    put_from_file(tfh, "data/input/pubcomp.dat", id)
+
+    get(f)
 
     @info "Testing disconnect"
     disconnect(client)
     @test is_out_correct(joinpath(outputdir, "disco.dat"), tfh.out_channel)
 
+
     #This has to be in it's own connect flow to not interfere with other messages
     @info "Testing keep alive with response"
-    client = Client(on_msg)
+    client = Client(on_msg, on_disconnect_ping, 1)
+    opts = ConnectOpts(() -> TestFileHandler())
+    opts.client_id = "TestID"
+    opts.keep_alive = 0x0001
+    connect(client, opts)
+    tfh = client.io
 
-    client.ping_timeout = 1
-    connect(client, "test.mosquitto.org", client_id="TestID", keep_alive=1)
-    tfh = client.socket
-    @test is_out_correct(joinpath(outputdir, "connect_keep_alive1s.dat"), tfh.out_channel) # Consume output
-    @test is_out_correct(joinpath(outputdir, "pingreq.dat"), tfh.out_channel)
-    put_from_file(tfh, joinpath(inputdir, "pingresp.dat"))
+    @test is_out_correct("data/output/connect_keep_alive1s.dat", tfh.out_channel) # Consume output
+    @test is_out_correct("data/output/pingreq.dat", tfh.out_channel)
+    put_from_file(tfh, "data/input/pingresp.dat")
 
     @info "Testing keep alive without response"
     sleep(1.1)
-    @test is_out_correct(joinpath(outputdir, "pingreq.dat"), tfh.out_channel)
-    @test is_out_correct(joinpath(outputdir, "disco.dat"), tfh.out_channel)
+    @test is_out_correct("data/output/pingreq.dat", tfh.out_channel)
 
     @info "Testing unwanted pingresp"
-    client = Client(on_msg)
-    connect(client, "test.mosquitto.org", client_id="TestID", keep_alive=15)
-    tfh = client.socket
-    put_from_file(tfh, joinpath(inputdir, "pingresp.dat"))
-    sleep(0.1)
-    @test tfh.closed
+    client = Client(on_msg, on_disconnect_pingresp, 60)
+    opts = ConnectOpts(() -> TestFileHandler())
+    opts.client_id = "TestID"
+    opts.keep_alive = 0x0001
+    connect(client, opts)
+    tfh = client.io
+
+    put_from_file(tfh, "data/input/pingresp.dat")
+    sleep(2)
 end
 
 test()

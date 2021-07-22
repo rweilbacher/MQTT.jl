@@ -1,42 +1,44 @@
-import MQTT.User
-
 @info "Running smoke tests"
 
 condition = Condition()
-topic = "foo"
-payload = randstring(20)
+expected_topic = randstring(20)
+expected_payload = convert(Array{UInt8}, randstring(20))
 
-function on_msg(t, p)
-    @info "Received message topic: [", t, "] payload: [", String(copy(p)), "]"
-    @test t == topic
-    @test String(copy(p))== payload
-
+function on_msg(topic, payload)
+    @info "Received message" topic=topic payload=String(copy(p))
+    @test topic == expected_topic
+    @test payload == expected_payload
     notify(condition)
 end
 
-client = Client(on_msg)
+function on_disconnect(reason)
+    @test reason == nothing
+end
+
+client = Client(on_msg, on_disconnect, 60)
+opts = ConnectOpts("test.mosquitto.org")
+opts.keep_alive = 0x0006
 
 @info "Testing reconnect"
-connect(client, "test.mosquitto.org")
+connect(client, opts)
 disconnect(client)
-connect(client, "test.mosquitto.org")
+connect(client, opts)
 
-subscribe(client, (topic, QOS_0))
+future = subscribe(client, (expected_topic, AT_MOST_ONCE), async=true)
+get(future)
 
 @info "Testing publish qos 0"
-publish(client, topic, payload, qos=QOS_0)
+publish(client, expected_topic, expected_payload, qos=AT_MOST_ONCE)
 wait(condition)
 
 @info "Testing publish qos 1"
-publish(client, topic, payload, qos=QOS_1)
+publish(client, expected_topic, expected_payload, qos=AT_LEAST_ONCE)
 wait(condition)
 
 @info "Testing publish qos 2"
-publish(client, topic, payload, qos=QOS_2)
+publish(client, expected_topic, expected_payload, qos=EXACTLY_ONCE)
 wait(condition)
 
-@info "Testing connect will"
-disconnect(client)
-connect(client, "test.mosquitto.org", will=Message(false, 0x00, false, topic, payload))
+sleep(10)
 
 disconnect(client)
