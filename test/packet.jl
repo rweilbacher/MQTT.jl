@@ -67,6 +67,8 @@ function test()
     opts.client_id = "TestID"
 
     last_id::UInt16 = 0x0001
+    inputdir = joinpath(datadir, "input")
+    outputdir = joinpath(datadir, "output")
 
     @info "Testing connect"
     connect(client, opts)
