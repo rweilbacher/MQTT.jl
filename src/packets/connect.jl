@@ -16,9 +16,10 @@ function write(s::IO, packet::Connect)
     mqtt_write(s, packet.protocol_name)
     mqtt_write(s, packet.protocol_level)
     clean_session_flag = UInt8(packet.clean_session) << 1
-    will_flag = UInt8(!isnothing(packet.will)) << 2
-    will_qos = (isnothing(packet.will) ? 0x00 : UInt8(get(packet.will).qos)) << 3
-    will_retain = (isnothing(packet.will) ? 0x00 : UInt8(get(packet.will).retain)) << 5
+    will = packet.will
+    will_flag = UInt8(!isnothing(will)) << 2
+    will_qos = (isnothing(will) ? 0x00 : UInt8(will.qos)) << 3
+    will_retain = (isnothing(will) ? 0x00 : UInt8(will.retain)) << 5
     username_flag = UInt8(!isnothing(packet.username)) << 6
     password_flag = UInt8(!isnothing(packet.password)) << 7
     connect_flags = clean_session_flag | will_flag | will_qos | will_retain | username_flag | password_flag
@@ -26,14 +27,14 @@ function write(s::IO, packet::Connect)
     mqtt_write(s, packet.keep_alive)
     mqtt_write(s, packet.client_id)
     if !isnothing(packet.will)
-        mqtt_write(s, get(packet.will).topic)
-        mqtt_write(s, get(packet.will).payload)
+        mqtt_write(s, will.topic)
+        mqtt_write(s, will.payload)
     end
     if !isnothing(packet.username)
-        mqtt_write(s, get(packet.username))
+        mqtt_write(s, packet.username)
     end
     if !isnothing(packet.password)
-        mqtt_write(s, get(packet.password))
+        mqtt_write(s, packet.password)
     end
 end
 
@@ -44,9 +45,9 @@ Base.show(io::IO, x::Connect) = print(io, "connect[protocol_name: '", x.protocol
 ", clean_session: ", x.clean_session,
 ", keep_alive: ", x.keep_alive,
 ", client_id: '", x.client_id, "'",
-", will: ", get(x.will, "none"),
-", username: ", get(x.username, "none"),
-", password: ", get(x.password, "none"), "]")
+", will: ", ifelse(isnothing(x.will), "(none)", x.will),
+", username: ", ifelse(isnothing(x.username), "(none)", x.username),
+", password: ", ifelse(isnothing(x.password), "(none)", x.password), "]")
 
 struct Connack <: Packet
     header::UInt8
