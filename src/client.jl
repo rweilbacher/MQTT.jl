@@ -12,12 +12,12 @@ mutable struct ConnectOpts
     clean_session::Bool
     keep_alive::UInt16
     client_id::String
-    will::Nullable{Message}
-    username::Nullable{String}
-    password::Nullable{Array{UInt8}}
+    will::Union{Message,Nothing}
+    username::Union{String,Nothing}
+    password::Union{Array{UInt8},Nothing}
     get_io::Function
 end
-ConnectOpts(get_io::Function) = ConnectOpts(true, 0x0000, "", Nullable{Message}(), Nullable{String}(), Nullable{Array{UInt8}}(), get_io)
+ConnectOpts(get_io::Function) = ConnectOpts(true, 0x0000, "", nothing, nothing, nothing, get_io)
 ConnectOpts(host::AbstractString, port::Integer=1883) = ConnectOpts(() -> connect(host, port))
 ConnectOpts() = ConnectOpts(() -> TCPSocket())
 
@@ -55,7 +55,7 @@ mutable struct Client
     Atomic{Float64}(),
     Atomic{Float64}(),
     Atomic{UInt16}(),
-    Timer(0, 0),
+    Timer(0, interval=0),
     TCPSocket())
 end
 
@@ -151,7 +151,7 @@ end
 
 function keep_alive_timer(c::Client)
     check_interval = (c.opts.keep_alive > 10) ? 5 : c.opts.keep_alive / 2
-    t = Timer(0, check_interval)
+    t = Timer(0, interval=check_interval)
     waiter = Task(function()
     println("keep alive started")
     while isopen(t)
@@ -244,7 +244,7 @@ function connect(client::Client, opts::ConnectOpts; async::Bool=false)
     send_packet(client, Connect(opts.clean_session, opts.keep_alive, opts.client_id, opts.will, opts.username, opts.password), async)
 end
 
-function disconnect(client::Client, reason::Union{Exception,Void}=nothing)
+function disconnect(client::Client, reason::Union{Exception,Nothing}=nothing)
     # ignore errors while disconnecting
     if client.disconnecting[] == 0x00
         atomic_xchg!(client.disconnecting, 0x01)
@@ -274,4 +274,4 @@ end
 publish(client::Client, topic::String, payload::String;
     async::Bool=false,
     qos::QOS=AT_MOST_ONCE,
-    retain::Bool=false) = publish(client, topic, convert(Array{UInt8}, payload), async=async, qos=qos, retain=retain)
+    retain::Bool=false) = publish(client, topic, Array{UInt8}(payload), async=async, qos=qos, retain=retain)

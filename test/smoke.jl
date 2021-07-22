@@ -2,7 +2,7 @@
 
 condition = Condition()
 expected_topic = randstring(20)
-expected_payload = convert(Array{UInt8}, randstring(20))
+expected_payload = Array{UInt8}(randstring(20))
 
 function on_msg(topic, payload)
     @info "Received message" topic=topic payload=String(copy(p))

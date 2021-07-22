@@ -19,6 +19,8 @@ PINGREQ = 0xC0,
 PINGRESP = 0xD0,
 DISCONNECT = 0xE0)
 
+Base.convert(::Type{UInt8}, x::PacketType) = UInt8(x)
+
 abstract type Packet end
 function write(s::IO, packet::Packet) end
 read(s::IO, flags::UInt8, t::Type{<: Packet}) = t()
