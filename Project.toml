@@ -1,6 +1,7 @@
+authors = ["AlexanderRohde <rohde.alx@gmail.com>"]
 name = "MQTT"
-uuid = "803124b1-ab64-583a-9601-4578af9b5026"
-version = "0.0.1"
+uuid = "572a640e-f7b4-11e8-215e-e1fc97963a1b"
+version = "0.1.0"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
