@@ -101,12 +101,12 @@ function send_packet(c::Client, packet::Packet, async::Bool=false)
 end
 
 function in_loop(c::Client)
-    println("in started")
+    @debug "in started"
     try
         while true
             packet = read_packet(c.io)
             atomic_xchg!(c.last_received, time())
-            println("in ", packet)
+            @debug "in" packet=packet
             handle(c, packet)
         end
     catch e
@@ -115,11 +115,11 @@ function in_loop(c::Client)
         end
         disconnect(c, e)
     end
-    println("in stopped")
+    @debug "in stopped"
 end
 
 function out_loop(c::Client)
-    println("out started")
+    @debug "out started"
     try
         while true
             packet, future = take!(c.queue)
@@ -134,7 +134,7 @@ function out_loop(c::Client)
             end
             atomic_xchg!(c.last_sent, time())
             write_packet(c.io, packet)
-            println("out ", packet)
+            @debug "out" packet=packet
             # complete the futures of packets that don't need acknowledgment
             if !has_id(packet)
                 put!(future, 0)
@@ -146,14 +146,14 @@ function out_loop(c::Client)
         end
         disconnect(c, e)
     end
-    println("out stopped")
+    @debug "out stopped"
 end
 
 function keep_alive_timer(c::Client)
     check_interval = (c.opts.keep_alive > 10) ? 5 : c.opts.keep_alive / 2
     t = Timer(0, interval=check_interval)
     waiter = Task(function()
-    println("keep alive started")
+    @debug "keep alive started"
     while isopen(t)
         keep_alive(c)
         try
@@ -162,7 +162,7 @@ function keep_alive_timer(c::Client)
             isa(e, EOFError) || rethrow(exc)
         end
     end
-    println("keep alive stopped")
+    @debug "keep alive stopped"
     end)
     yield(waiter)
     return t
