@@ -43,20 +43,22 @@ mutable struct Client
     keep_alive_timer::Timer
     io::IO
 
-    Client(on_msg::Function, on_disconnect::Function, ping_timeout::Int64) = new(
-    on_msg,
-    on_disconnect,
-    ping_timeout,
-    ConnectOpts(),
-    0x0000,
-    Dict{UInt16, Future}(),
-    Channel{Tuple{Packet, Future}}(60),
-    Atomic{UInt8}(0x00),
-    Atomic{Float64}(),
-    Atomic{Float64}(),
-    Atomic{UInt16}(),
-    Timer(0, interval=0),
-    TCPSocket())
+    Client(on_msg::Function,
+           on_disconnect::Function = x -> @info("on_disconnect", msg=x),
+           ping_timeout::Int64 = 60) = new(
+      on_msg,
+      on_disconnect,
+      ping_timeout,
+      ConnectOpts(),
+      0x0000,
+      Dict{UInt16, Future}(),
+      Channel{Tuple{Packet, Future}}(60),
+      Atomic{UInt8}(0x00),
+      Atomic{Float64}(),
+      Atomic{Float64}(),
+      Atomic{UInt16}(),
+      Timer(0, interval=0),
+      TCPSocket())
 end
 
 function packet_id(c::Client)
@@ -94,7 +96,7 @@ function send_packet(c::Client, packet::Packet, async::Bool=false)
     future = Future()
     put!(c.queue, (packet, future))
     if async
-        return future
+        future
     else
         get(future)
     end
