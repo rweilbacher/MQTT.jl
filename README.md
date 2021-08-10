@@ -69,9 +69,10 @@ using MQTT
 To use this library you need to follow at least these steps:
 1. Define an `on_msg` callback function.
 2. Create an instance of the `Client` struct and pass it your `on_msg` function.
-3. Call the connect method with your `Client` instance.
-4. Exchange data with the broker through publish, subscribe and unsubscribe.
-5. Disconnect from the broker. (Not strictly necessary, if you don't want to resume the session but considered good form and less likely to crash).
+3. Create an instance of the `ConnectOpts` struct and set the broker URL.
+4. Call the `connect` method with your `Client` instance.
+5. Exchange data with the broker through publish, subscribe and unsubscribe.
+6. Disconnect from the broker. (Not strictly necessary, if you don't want to resume the session but considered good form and less likely to crash).
 
 #### Basic example
 Refer to the corresponding method documentation to find more options.
@@ -81,18 +82,18 @@ using MQTT
 broker = "test.mosquitto.org"
 
 #Define the callback for receiving messages.
-function on_msg(topic, payload)
-    info("Received message topic: [", topic, "] payload: [", String(payload), "]")
-end
+on_msg(topic::String, payload::Vector{UInt8}) =
+  @info "Received message" topic=topic payload=String(payload)
 
 #Instantiate a client.
 client = Client(on_msg)
-connect(client, broker)
+opts = ConnectOpts(broker)
+connect(client, opts)
 #Set retain to true so we can receive a message from the broker once we subscribe
 #to this topic.
 publish(client, "jlExample", "Hello World!", retain=true)
-#Subscribe to the topic we sent a retained message to.
-subscribe(client, ("jlExample", QOS_1))
+#Subscribe to the topic we sent a retained message to with QOS level 1.
+subscribe(client, ("jlExample", AT_MOST_ONCE))
 #Unsubscribe from the topic
 unsubscribe(client, "jlExample")
 #Disconnect from the broker. Not strictly needed as the broker will also
@@ -116,12 +117,12 @@ The client struct is used to store state for an MQTT connection. All callbacks, 
 All constructors take the `on_message` callback as an argument.
 
 ```julia
-Client(on_msg::Function)
+Client(on_message::Function)
 ```
 
-Specify a custom ping_timeout
+Specify a custom `on_disconnect` callback and `ping_timeout` value, the default value is `60` (sec).
 ```julia
-Client(on_msg::Function, ping_timeout::UInt64)
+Client(on_msg::Function, on_disconnect::Function = x -> @info(x), ping_timeout::UInt64 = 60)
 ```
 
 ## Message struct
