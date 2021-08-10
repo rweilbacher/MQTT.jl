@@ -3,7 +3,7 @@ struct Publish <: Packet
     id::UInt16
     message::Message
 end
-Publish(message::Message) = Publish(convert(UInt8, PUBLISH) | ((message.dup & 0x1) << 3) | (convert(UInt8, message.qos) << 1) | message.retain, 0x0000, message)
+Publish(message::Message) = Publish(UInt8(PUBLISH) | ((message.dup & 0x1) << 3) | (UInt8(message.qos) << 1) | message.retain, 0x0000, message)
 Publish(packet::Publish, id::UInt16) = Publish(packet.header, id, packet.message)
 
 function read(s::IO, flags::UInt8, ::Type{Publish})
@@ -56,7 +56,7 @@ struct Pubrel <: Ack
     header::UInt8
     id::UInt16
 end
-Pubrel(id) = Pubrel(convert(UInt8, PUBREL) | 0x02, id)
+Pubrel(id) = Pubrel(UInt8(PUBREL) | 0x02, id)
 has_id(packet::Pubrel) = false
 Base.show(io::IO, x::Pubrel) = print(io, "pubrel[id: ", x.id, "]")
 

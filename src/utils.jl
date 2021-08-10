@@ -14,24 +14,24 @@ function mqtt_write(stream::IO, x::UInt16)
 end
 
 function mqtt_write(stream::IO, x::String)
-    mqtt_write(stream, convert(UInt16, length(x)))
+    mqtt_write(stream, UInt16(length(x)))
     write(stream, x)
 end
 
 function mqtt_write(stream::IO, x::Array{UInt8})
-    mqtt_write(stream, convert(UInt16, length(x)))
+    mqtt_write(stream, UInt16(length(x)))
     write(stream, x)
 end
 
 function write_len(s::IO, len::Int64)
     while true
-        b = convert(UInt8, mod(len, 128))
+        b = UInt8(mod(len, 128))
         len = div(len, 128)
         if len > 0
             b = b | 0x80
         end
         write(s, b)
-        if(len == 0)
+        if (len == 0)
             break
         end
     end

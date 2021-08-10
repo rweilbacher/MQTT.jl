@@ -1,6 +1,13 @@
 module MQTT
 
-import Base: connect, read, write, get
+import Base: read, write, get
+import Sockets: connect
+
+using Base.Threads
+using Dates
+using Distributed
+using Random
+using Sockets
 
 include("utils.jl")
 include("packet.jl")

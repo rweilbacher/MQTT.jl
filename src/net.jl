@@ -14,7 +14,7 @@ function read_packet(s::IO)
     len = read_len(s)
     # read variable header and payload into buffer
     buffer = PipeBuffer(read(s, len))
-    packet_type = convert(PacketType,header & 0xF0)
+    packet_type = PacketType(header & 0xF0)
     flags = header & 0x0F
     packet = read(buffer, flags, PACKETS[packet_type])
     return packet

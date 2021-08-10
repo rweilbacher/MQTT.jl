@@ -3,6 +3,9 @@ AT_MOST_ONCE = 0x00,
 AT_LEAST_ONCE = 0x01,
 EXACTLY_ONCE = 0x02)
 
+Base.convert(::Type{UInt8}, x::QOS) = UInt8(x)
+Base.convert(::Type{QOS}, x::UInt8) = QOS(x)
+
 @enum(PacketType::UInt8,
 CONNECT = 0x10,
 CONNACK = 0x20,
@@ -18,6 +21,9 @@ UNSUBACK = 0xB0,
 PINGREQ = 0xC0,
 PINGRESP = 0xD0,
 DISCONNECT = 0xE0)
+
+Base.convert(::Type{UInt8}, x::PacketType) = UInt8(x)
+Base.convert(::Type{PacketType}, x::UInt8) = PacketType(x)
 
 abstract type Packet end
 function write(s::IO, packet::Packet) end
